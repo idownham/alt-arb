@@ -6,7 +6,7 @@ and build the system to capture it safely if it does.
 
 ## Phase 1 — Scanner (weeks 1–2) · no money at risk
 - [x] Project setup: `pyproject.toml`, `.venv`, `.gitignore` (incl. `.env`), pytest
-- [ ] Kalshi client: list markets, fetch order book (public data)
+- [x] Kalshi client: list markets, fetch order book (public data)
 - [ ] Polymarket US client: list markets, fetch order book (public API, no key)
 - [ ] `data/pairs.csv` schema: kalshi_ticker, polymarket_id, description, resolution notes, expiry, verified, verified_by, verified_on
 - [ ] Hand-verify 20–50 pairs (start with sports + major politics/econ — the most overlap)
