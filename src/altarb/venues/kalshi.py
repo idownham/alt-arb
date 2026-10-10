@@ -17,31 +17,9 @@ from typing import Any
 
 import httpx
 
+from altarb.venues.models import OrderBook, PriceLevel
+
 BASE_URL = "https://api.elections.kalshi.com/trade-api/v2"
-ONE = Decimal("1")
-
-
-@dataclass(frozen=True)
-class PriceLevel:
-    price: Decimal  # dollars per contract, 0 < price < 1
-    size: Decimal  # contracts available at this price
-
-
-@dataclass(frozen=True)
-class OrderBook:
-    ticker: str
-    yes_bids: list[PriceLevel]  # best (highest) first
-    no_bids: list[PriceLevel]  # best (highest) first
-
-    @property
-    def yes_asks(self) -> list[PriceLevel]:
-        """Prices to buy YES, cheapest first (each is the complement of a NO bid)."""
-        return [PriceLevel(ONE - lvl.price, lvl.size) for lvl in self.no_bids]
-
-    @property
-    def no_asks(self) -> list[PriceLevel]:
-        """Prices to buy NO, cheapest first (each is the complement of a YES bid)."""
-        return [PriceLevel(ONE - lvl.price, lvl.size) for lvl in self.yes_bids]
 
 
 @dataclass(frozen=True)
