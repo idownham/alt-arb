@@ -8,7 +8,7 @@ and build the system to capture it safely if it does.
 - [x] Project setup: `pyproject.toml`, `.venv`, `.gitignore` (incl. `.env`), pytest
 - [x] Kalshi client: list markets, fetch order book (public data)
 - [x] Polymarket US client: list markets, fetch order book (public API, no key)
-- [ ] `data/pairs.csv` schema: kalshi_ticker, polymarket_id, description, resolution notes, expiry, verified, verified_by, verified_on
+- [x] `data/pairs.csv` schema: kalshi_ticker, polymarket_slug, inverted, description, resolution_notes, expiry, verified, verified_by, verified_on (see `docs/pairs.md`)
 - [ ] Hand-verify 20–50 pairs (start with sports + major politics/econ — the most overlap)
 - [ ] Candidate matcher: suggest likely pairs from titles/dates for human review
 
