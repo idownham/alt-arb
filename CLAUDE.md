@@ -51,7 +51,10 @@ tests/
 2. **Secrets only in `.env`**, which is gitignored. Never print, log, or commit API keys.
 3. **A market pair is only usable if `verified = true` in `data/pairs.csv`.** Verification means a human compared
    resolution criteria, resolution source, deadline/expiry, and edge cases (ties, cancellations, postponements) on both venues.
-   Fuzzy/LLM matching may only *suggest* candidates — it never sets `verified`.
+   Fuzzy/LLM matching may only *suggest* candidates — it never sets `verified` on its own.
+   Exception: an agent may record `verified = true` with `verified_by = Agent` only after presenting the full
+   comparison and getting the owner's explicit approval for that specific pair in chat. `Agent` rows were
+   reviewed by an agent rather than read first-hand by a human; re-check them if in doubt.
 4. **Edge is always net of fees on both legs, sized against order-book depth** — never top-of-book alone.
 5. **Leg risk:** any execution code must define behavior for partial fills (min fill threshold, which leg fires first,
    unwind/chase policy) before it can run.

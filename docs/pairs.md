@@ -33,7 +33,7 @@ and other non-game markets aren't matched automatically yet.
 | `resolution_notes` | `PM settles at fair price if postponed >2wk; Kalshi ...` | Differences you found |
 | `expiry` | `2026-10-17` | Date (or datetime) the pair resolves by |
 | `verified` | `true` | Only after the checklist below |
-| `verified_by` | `Ian` | Required when verified |
+| `verified_by` | `Ian` | Required when verified. `Agent` = an agent did the comparison and Ian approved it in chat (CLAUDE.md rule 3) |
 | `verified_on` | `2026-10-12` | Required when verified |
 
 The loader (`altarb.mapping.pairs.load_pairs`) rejects the whole file on any bad row,
