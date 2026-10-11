@@ -171,3 +171,25 @@ def test_live_fetch_markets_and_orderbook():
     assert fetched.slug == market.slug
     for lvl in book.yes_bids + book.no_bids:
         assert Decimal(0) < lvl.price < Decimal(1)
+
+
+def test_honors_retry_after_header():
+    responses = iter([httpx.Response(429, headers={"Retry-After": "10"}), httpx.Response(200, json=BOOK)])
+    sleeps = []
+
+    make_client(lambda req: next(responses), sleep=sleeps.append).get_orderbook(SLUG)
+
+    assert sleeps == [10.0]
+
+
+def test_caps_retry_after_and_falls_back_on_bad_header():
+    responses = iter([
+        httpx.Response(429, headers={"Retry-After": "3600"}),
+        httpx.Response(429, headers={"Retry-After": "Wed, 21 Oct 2026 07:28:00 GMT"}),
+        httpx.Response(200, json=BOOK),
+    ])
+    sleeps = []
+
+    make_client(lambda req: next(responses), sleep=sleeps.append).get_orderbook(SLUG)
+
+    assert sleeps == [60.0, 2]  # capped at 60s; unparseable date -> exponential backoff (2nd attempt = 2s)
