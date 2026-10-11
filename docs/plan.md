@@ -17,7 +17,7 @@ and build the system to capture it safely if it does.
 - [x] Fee models for both venues, with unit tests (Kalshi 0.07 base still to confirm against the fee schedule PDF)
 - [x] Depth-aware edge: walk both books, compute fillable size and net profit at each level
 - [x] Annualized return using time to resolution (simple, days floored at 1)
-- [ ] Scanner loop → SQLite: every snapshot + every opportunity above threshold
+- [x] Scanner loop → SQLite: every snapshot + every opportunity above threshold (`python -m altarb.scanner`; REST, ~75s/scan)
 - [ ] Switch live books to WebSockets
 - [ ] Run continuously (laptop first, then a small cloud server)
 

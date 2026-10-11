@@ -73,13 +73,8 @@ def find_edges(
 
     days = Decimal((resolves_at - now).total_seconds()) / SECONDS_PER_DAY
     pm_theta = POLYMARKET_TAKER_TABLE_TENNIS if table_tennis else POLYMARKET_TAKER
-    directions = [
-        ("yes", kalshi_book.yes_asks, "yes" if pair.inverted else "no"),
-        ("no", kalshi_book.no_asks, "no" if pair.inverted else "yes"),
-    ]
     found = []
-    for kalshi_side, kalshi_asks, pm_side in directions:
-        pm_asks = polymarket_book.yes_asks if pm_side == "yes" else polymarket_book.no_asks
+    for kalshi_side, kalshi_asks, pm_side, pm_asks in hedge_legs(pair, kalshi_book, polymarket_book):
         best = _best_size(kalshi_asks, pm_asks, kalshi_fee, pm_theta, table_tennis, max_contracts)
         if best is None:
             continue
@@ -102,6 +97,19 @@ def find_edges(
             annualized_return=ret * 365 / max(days, ONE),
         ))
     return sorted(found, key=lambda o: o.annualized_return, reverse=True)
+
+
+def hedge_legs(
+    pair: MarketPair, kalshi_book: OrderBook, polymarket_book: OrderBook
+) -> list[tuple[str, list[PriceLevel], str, list[PriceLevel]]]:
+    """Both hedge directions as (kalshi_side, kalshi_asks, polymarket_side, polymarket_asks)."""
+    legs = []
+    for kalshi_side, kalshi_asks in (("yes", kalshi_book.yes_asks), ("no", kalshi_book.no_asks)):
+        # Not inverted: hedge Kalshi YES with Polymarket NO. Inverted: with Polymarket YES.
+        pm_side = kalshi_side if pair.inverted else ("no" if kalshi_side == "yes" else "yes")
+        pm_asks = polymarket_book.yes_asks if pm_side == "yes" else polymarket_book.no_asks
+        legs.append((kalshi_side, kalshi_asks, pm_side, pm_asks))
+    return legs
 
 
 def _best_size(

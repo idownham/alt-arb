@@ -16,7 +16,8 @@ Primary goal: a working, well-engineered system with real spread data. Trading P
   (`KALSHI-ACCESS-KEY`, `KALSHI-ACCESS-SIGNATURE`, `KALSHI-ACCESS-TIMESTAMP`). Docs: https://docs.kalshi.com
 - **Polymarket US** — the CFTC-regulated US exchange (NOT the international crypto exchange, which is close-only for US users).
   Public market-data API needs no key; trading API uses Ed25519 keys and requires KYC. Docs: https://docs.polymarket.us
-  Public REST is rate limited (~60 req/min) — use WebSockets for live order books.
+  Public REST is rate limited: measured ~30 req/min, then a 10s block (`Retry-After: 10`); the scanner paces
+  at 2.5s/request. Use WebSockets for live order books.
 
 ## Fees (verify against current docs before relying on these; implemented in `pricing/fees.py`)
 - Kalshi taker: `M × 0.07 × C × P × (1 − P)`; maker is 0.25× that (`quadratic_with_maker_fees`), 0.5×
