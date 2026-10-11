@@ -132,6 +132,23 @@ class PolymarketClient:
                 return
             params["offset"] += len(items)
 
+    def list_league_markets(self, league: str, page_size: int = 100) -> Iterator[Market]:
+        """Yield every market in one league's events, e.g. league="nba".
+
+        Much cheaper than list_markets for a single league: the whole NBA is one
+        request, versus ~145 to list every sports market. `league` is the code that
+        appears in market slugs (aec-<league>-...).
+        """
+        offset = 0
+        while True:
+            events = self._get(f"/v2/leagues/{league}/events", {"limit": page_size, "offset": offset}).get("events") or []
+            for event in events:
+                for item in event.get("markets") or []:
+                    yield Market.from_api(item)
+            if len(events) < page_size:
+                return
+            offset += len(events)
+
     def get_market(self, slug: str) -> Market:
         # Note the singular "market" here, unlike the list and book endpoints.
         return Market.from_api(self._get(f"/v1/market/slug/{slug}")["market"])

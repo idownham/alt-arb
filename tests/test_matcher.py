@@ -165,3 +165,33 @@ def test_suggestions_round_trip_through_pairs_schema(tmp_path):
     write_pairs(path, pairs)
 
     assert load_pairs(path) == pairs
+
+
+def test_fetch_markets_queries_only_requested_series_and_leagues():
+    from altarb.mapping.matcher import POLYMARKET_PACE_SECONDS, fetch_markets
+
+    class FakeKalshi:
+        def __init__(self):
+            self.series = []
+
+        def list_markets(self, series_ticker):
+            self.series.append(series_ticker)
+            return iter(KALSHI_NHL if series_ticker == "KXNHLGAME" else [])
+
+    class FakePolymarket:
+        def __init__(self):
+            self.leagues = []
+
+        def list_league_markets(self, league):
+            self.leagues.append(league)
+            return iter([NHL_GAME] if league == "nhl" else [])
+
+    k, p, sleeps = FakeKalshi(), FakePolymarket(), []
+    leagues = {**LEAGUES, "KXSERIECGAME": frozenset({"serca", "sercb", "sercc"})}
+
+    kalshi_markets, pm_markets = fetch_markets(k, p, ["KXNHLGAME", "KXSERIECGAME"], leagues, sleep=sleeps.append)
+
+    assert k.series == ["KXNHLGAME", "KXSERIECGAME"]
+    assert p.leagues == ["nhl", "serca", "sercb", "sercc"]
+    assert sleeps == [POLYMARKET_PACE_SECONDS] * 3  # paced between Polymarket requests
+    assert len(suggest_pairs(kalshi_markets, pm_markets, leagues)) == 2

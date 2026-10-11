@@ -14,7 +14,8 @@ python3 -m venv .venv
 
 ## Workflow
 
-1. **Find candidate pairs:** `.venv/bin/python -m altarb.mapping.matcher` writes `data/candidates.csv`.
+1. **Find candidate pairs:** `.venv/bin/python -m altarb.mapping.matcher --league KXNBAGAME` writes
+   `data/candidates.csv` (omit `--league` for every mapped league).
 2. **Verify them** into `data/pairs.csv` following `docs/pairs.md`.
 3. **Scan:** `.venv/bin/python -m altarb.scanner` checks every verified pair every 90s and logs to
    `data/scanner.db`. Stop with Ctrl+C. `--once` runs a single scan; `--min-profit 1` only logs

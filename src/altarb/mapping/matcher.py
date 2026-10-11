@@ -14,14 +14,16 @@ in their identifiers, e.g.
 Games are compared only within a mapped league (leagues.py) and date, and teams
 are matched by name (abbreviations differ between venues: MTL vs mon).
 
-Run:  python -m altarb.mapping.matcher   (writes data/candidates.csv)
+Run:  python -m altarb.mapping.matcher                      (all mapped leagues, writes data/candidates.csv)
+      python -m altarb.mapping.matcher --league KXNBAGAME    (just one league; repeatable)
 """
 
 from __future__ import annotations
 
 import re
+import time
 from collections import defaultdict
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from typing import Any
@@ -183,15 +185,51 @@ def _tokens(text: str) -> frozenset[str]:
     return frozenset(re.findall(r"[a-z0-9]+", text.lower()))
 
 
+POLYMARKET_PACE_SECONDS = 2.5  # shares the public gateway's ~30 req/min with the running scanner
+
+
+def fetch_markets(
+    kalshi_client: kalshi.KalshiClient,
+    pm_client: polymarket.PolymarketClient,
+    series: Iterable[str],
+    leagues: dict[str, frozenset[str]] = LEAGUES,
+    sleep: Callable[[float], None] = time.sleep,
+) -> tuple[list[kalshi.Market], list[polymarket.Market]]:
+    """Open markets for just these Kalshi series and their mapped Polymarket leagues.
+
+    One Kalshi request per series and usually one Polymarket request per league,
+    instead of listing every market on both venues.
+    """
+    series = sorted(series)
+    kalshi_markets = [m for s in series for m in kalshi_client.list_markets(series_ticker=s)]
+    pm_markets: list[polymarket.Market] = []
+    for i, league in enumerate(sorted({code for s in series for code in leagues[s]})):
+        if i:
+            sleep(POLYMARKET_PACE_SECONDS)
+        pm_markets.extend(pm_client.list_league_markets(league))
+    return kalshi_markets, pm_markets
+
+
 def main() -> None:
+    import argparse
+
     from altarb.mapping.pairs import DEFAULT_PATH, load_pairs, write_pairs
 
+    parser = argparse.ArgumentParser(description="Suggest unverified game-winner pairs into data/candidates.csv.")
+    parser.add_argument("--league", action="append", metavar="KALSHI_SERIES",
+                        help="only these Kalshi series, e.g. --league KXNBAGAME (repeatable; default: all mapped)")
+    args = parser.parse_args()
+    series = args.league or sorted(LEAGUES)
+    unknown = [s for s in series if s not in LEAGUES]
+    if unknown:
+        parser.error(f"not in leagues.py: {', '.join(unknown)}")
+
     out = DEFAULT_PATH.with_name("candidates.csv")
-    print("Fetching open markets (this takes a couple of minutes)...")
-    with kalshi.KalshiClient(max_retries=6) as k:
-        kalshi_markets = [m for m in k.list_markets() if m.event_ticker.partition("-")[0] in LEAGUES]
-    with polymarket.PolymarketClient() as p:
-        pm_markets = list(p.list_markets(categories=["sports"]))
+    leagues_count = len({code for s in series for code in LEAGUES[s]})
+    print(f"Fetching {len(series)} Kalshi series and {leagues_count} Polymarket leagues "
+          f"(at least {leagues_count * POLYMARKET_PACE_SECONDS:.0f}s at the Polymarket rate limit)...")
+    with kalshi.KalshiClient(max_retries=6) as k, polymarket.PolymarketClient(max_retries=6) as p:
+        kalshi_markets, pm_markets = fetch_markets(k, p, series)
 
     existing = {(x.kalshi_ticker, x.polymarket_slug) for x in load_pairs(DEFAULT_PATH)}
     suggestions = [s for s in suggest_pairs(kalshi_markets, pm_markets) if
@@ -199,7 +237,7 @@ def main() -> None:
     write_pairs(out, suggestions)
 
     flagged = sum(1 for s in suggestions if s.resolution_notes)
-    print(f"Kalshi game markets: {len(kalshi_markets)}, Polymarket sports markets: {len(pm_markets)}")
+    print(f"Kalshi game markets: {len(kalshi_markets)}, Polymarket league markets: {len(pm_markets)}")
     print(f"Wrote {len(suggestions)} unverified suggestions to {out} ({flagged} flagged for extra care)")
     print("Review each against docs/pairs.md before copying it into data/pairs.csv.")
 

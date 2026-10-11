@@ -6,10 +6,12 @@ The scanner only uses rows with `verified = true` (CLAUDE.md hard rule 3).
 ## Finding candidates
 
 ```bash
-.venv/bin/python -m altarb.mapping.matcher
+.venv/bin/python -m altarb.mapping.matcher --league KXNBAGAME   # one league: a few seconds
+.venv/bin/python -m altarb.mapping.matcher                      # every league in leagues.py: ~4 min
 ```
 
-This writes `data/candidates.csv` (not committed; regenerate any time) with suggested
+`--league` takes Kalshi series tickers from `src/altarb/mapping/leagues.py` and can be repeated.
+Pairs already in `data/pairs.csv` are left out. This writes `data/candidates.csv` (not committed; regenerate any time) with suggested
 game-winner pairs in the same columns, all `verified = false`. For each one you want:
 
 1. Open both markets and work through the checklist below.

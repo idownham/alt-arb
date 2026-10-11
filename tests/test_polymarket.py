@@ -193,3 +193,24 @@ def test_caps_retry_after_and_falls_back_on_bad_header():
     make_client(lambda req: next(responses), sleep=sleeps.append).get_orderbook(SLUG)
 
     assert sleeps == [60.0, 2]  # capped at 60s; unparseable date -> exponential backoff (2nd attempt = 2s)
+
+
+def test_list_league_markets_pages_until_short_page():
+    seen = []
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        seen.append((req.url.path, req.url.params["offset"]))
+        events = {"0": [{"markets": [MARKET]}, {"markets": [{**MARKET, "slug": "b"}]}],
+                  "2": [{"markets": [{**MARKET, "slug": "c"}, {**MARKET, "slug": "d"}]}]}[req.url.params["offset"]]
+        return httpx.Response(200, json={"type": "sport", "events": events})
+
+    slugs = [m.slug for m in make_client(handler).list_league_markets("nba", page_size=2)]
+
+    assert slugs == [SLUG, "b", "c", "d"]
+    assert seen == [("/v2/leagues/nba/events", "0"), ("/v2/leagues/nba/events", "2")]  # page 2 was short: stop
+
+
+def test_list_league_markets_empty_league():
+    client = make_client(lambda req: httpx.Response(200, json={"type": "sport", "events": []}))
+
+    assert list(client.list_league_markets("xyz")) == []
