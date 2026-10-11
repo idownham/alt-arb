@@ -1,0 +1,10 @@
+# Pulls the latest pairs/code from GitHub; run every 15 minutes by altarb-update.timer.
+# Logs: journalctl -u altarb-update
+[Unit]
+Description=alt-arb: pull latest pairs and code, restart scanner if code changed and tests pass
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/alt-arb/deploy/update.sh

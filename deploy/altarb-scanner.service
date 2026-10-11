@@ -1,0 +1,20 @@
+# The scanner, run by systemd on the cloud server. Installed by deploy/setup.sh.
+# Logs: journalctl -u altarb-scanner -f
+[Unit]
+Description=alt-arb scanner (read-only: logs Kalshi/Polymarket edges to SQLite)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=altarb
+WorkingDirectory=/opt/alt-arb
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/alt-arb/.venv/bin/python -m altarb.scanner
+Restart=always
+RestartSec=60
+# SIGTERM stops it cleanly (the scanner treats it like Ctrl+C).
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

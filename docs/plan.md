@@ -22,7 +22,8 @@ and build the system to capture it safely if it does.
       API keys (KYC'd accounts), even for public market data. Until then REST scans take ~75s, so gaps that
       open and close faster than that can be missed; keep that bias in mind at Decision point A.
 - [x] Run continuously on the laptop (`scripts/scanner-service.sh`, launchd)
-- [ ] Run continuously on a small cloud server (so lid-closed / travel doesn't leave gaps)
+- [ ] Run continuously on a small cloud server (so lid-closed / travel doesn't leave gaps) — deploy scripts
+      ready and container-tested (`deploy/`, `docs/deploy.md`); waiting on the owner creating the server
 
 **Decision point A (end of week 4):** Review the log. How often do net-positive gaps appear, how big,
 how deep, how long do they last? If edge is negligible, stop here — the system is still a finished project.
