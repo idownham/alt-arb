@@ -22,6 +22,19 @@ python3 -m venv .venv
 
 A scan takes ~75s for 28 games, because Polymarket's public API allows ~30 requests/minute.
 
+### Running it continuously (macOS)
+
+```bash
+scripts/scanner-service.sh install     # start now and at every login; restarts within 60s if it crashes
+scripts/scanner-service.sh status      # running? last scans, opportunities so far
+scripts/scanner-service.sh logs        # follow data/scanner.log
+scripts/scanner-service.sh uninstall   # stop and remove the service
+```
+
+It runs under `caffeinate -is`, so the Mac won't idle-sleep (or system-sleep while plugged in).
+Closing the lid still sleeps the Mac; scans pause and resume on wake. After adding verified
+pairs there's no need to restart: each scan reloads `data/pairs.csv`.
+
 ## Reading the log
 
 `data/scanner.db` is SQLite (`sqlite3 data/scanner.db`). Money columns are text, so cast for math.

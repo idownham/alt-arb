@@ -19,7 +19,8 @@ and build the system to capture it safely if it does.
 - [x] Annualized return using time to resolution (simple, days floored at 1)
 - [x] Scanner loop → SQLite: every snapshot + every opportunity above threshold (`python -m altarb.scanner`; REST, ~75s/scan)
 - [ ] Switch live books to WebSockets
-- [ ] Run continuously (laptop first, then a small cloud server)
+- [x] Run continuously on the laptop (`scripts/scanner-service.sh`, launchd)
+- [ ] Run continuously on a small cloud server (so lid-closed / travel doesn't leave gaps)
 
 **Decision point A (end of week 4):** Review the log. How often do net-positive gaps appear, how big,
 how deep, how long do they last? If edge is negligible, stop here — the system is still a finished project.
