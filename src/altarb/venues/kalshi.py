@@ -18,6 +18,7 @@ from typing import Any
 
 import httpx
 
+from altarb.pricing.fees import KalshiFeeOverride, KalshiFeeStructure
 from altarb.venues.http import get_json
 from altarb.venues.models import OrderBook, PriceLevel
 
@@ -129,6 +130,27 @@ class KalshiClient:
             no_bids=_parse_levels(book.get("no_dollars")),
         )
 
+    def get_series_fee(self, series_ticker: str) -> KalshiFeeStructure:
+        series = self._get(f"/series/{series_ticker}")["series"]
+        return KalshiFeeStructure(series["fee_type"], _parse_number(series["fee_multiplier"]))
+
+    def get_event_fee_overrides(self, event_ticker: str) -> list[KalshiFeeOverride]:
+        """Scheduled fee overrides for one event; pair with kalshi_effective_fee()."""
+        params: dict[str, Any] = {"event_ticker": event_ticker}
+        overrides = []
+        while True:
+            data = self._get("/events/fee_changes", params)
+            for item in data.get("event_fee_changes", []):
+                multiplier = item.get("fee_multiplier_override")
+                overrides.append(KalshiFeeOverride(
+                    scheduled=_parse_time(item["scheduled_ts"]),
+                    fee_type=item.get("fee_type_override"),
+                    multiplier=_parse_number(multiplier) if multiplier is not None else None,
+                ))
+            if not data.get("cursor"):
+                return overrides
+            params["cursor"] = data["cursor"]
+
     def _get(self, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
         return get_json(self._http, path, params, self._max_retries, self._sleep)
 
@@ -141,6 +163,11 @@ def _parse_levels(raw: list[list[str]] | None) -> list[PriceLevel]:
 
 def _parse_decimal(value: str | None) -> Decimal | None:
     return Decimal(value) if value not in (None, "") else None
+
+
+def _parse_number(value: float | int | str) -> Decimal:
+    # JSON numbers arrive as float; go through str() so 1.5 stays exactly Decimal("1.5").
+    return Decimal(str(value))
 
 
 def _parse_time(value: str | None) -> datetime | None:

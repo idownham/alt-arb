@@ -9,7 +9,7 @@ Owner: Ian Downham (GitHub: idownham). Side project, built part-time over ~2 mon
 Primary goal: a working, well-engineered system with real spread data. Trading P&L is a bonus, not the target.
 
 ## Current phase
-**Phase 1 — Scanner (no money at risk).** See `docs/plan.md` for the full roadmap. Update this line when the phase changes.
+**Phase 2 — Edge calculation + data log (no money at risk).** See `docs/plan.md` for the full roadmap. Update this line when the phase changes.
 
 ## Venues
 - **Kalshi** — CFTC-regulated, USD-funded. REST + WebSocket APIs; authenticated requests are RSA-PSS signed
@@ -18,10 +18,14 @@ Primary goal: a working, well-engineered system with real spread data. Trading P
   Public market-data API needs no key; trading API uses Ed25519 keys and requires KYC. Docs: https://docs.polymarket.us
   Public REST is rate limited (~60 req/min) — use WebSockets for live order books.
 
-## Fees (verify against current docs before relying on these)
-- Kalshi taker: `ceil(M × 0.07 × C × P × (1 − P))`, maker: `M × 0.0175 × C × P × (1 − P)`; `M` varies by series.
-  Peaks ~1.75¢/contract at P = 0.50. Fetch the series multiplier from the API — never hardcode.
-- Polymarket US: varies by market category. Fetch/configure per market — never hardcode a single rate.
+## Fees (verify against current docs before relying on these; implemented in `pricing/fees.py`)
+- Kalshi taker: `M × 0.07 × C × P × (1 − P)`; maker is 0.25× that (`quadratic_with_maker_fees`), 0.5×
+  (`quadratic_with_combo_maker_fees`) or zero (`quadratic`). `flat` is unmodeled — skip those markets.
+  Fee rounds up to $0.000001; a retail order's total cash rounds up to the cent.
+  Fetch `fee_type`/`M` from the series AND apply scheduled event overrides (`/events/fee_changes`) — never hardcode.
+  The 0.07 base is not yet re-checked against kalshi.com/docs/kalshi-fee-schedule.pdf (blocks automated download).
+- Polymarket US (effective 2026-10-07): `Θ × C × p × (1 − p)`, banker's-rounded to the cent. Θ = 0.0695 taker
+  (0.10 table tennis); makers get a 0.0125 rebate. Docs: https://docs.polymarket.us/fees
 
 ## Architecture (target)
 ```
