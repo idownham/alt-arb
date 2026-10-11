@@ -1,0 +1,20 @@
+{
+  "KXNBAGAME": {
+    "kalshi": "If <TEAMS> wins the <TEAMS> vs <TEAMS> Pro Basketball game originally scheduled for <DATE>, then the market resolves to Yes.\nIf the game is postponed but begins within 48 hours of its originally scheduled start time, the market will remain open and resolve based on the official final result. If the game is cancelled or not started within 48 hours of its originally scheduled start, all markets will resolve to a fair price.\n\nKalshi is not affiliated, associated, authorized, endorsed by, or in any way officially connected with the Governing League. All trademarks, logos, and brand names are the property of their respective owners.",
+    "polymarket": "This market will settle to the winner of the <TEAMS> vs <TEAMS> professional basketball game originally scheduled for <DATE> at <TIME>. Overtime is included if played. If the game is delayed, postponed, suspended, or otherwise rescheduled and is not rescheduled to start within two calendar days of the originally scheduled date and time, the market will settle to the last fair market price. Outcome sourced from the relevant governing body.",
+    "note": "Postponement windows match (Kalshi 48h; Polymarket two calendar days). If never played, each venue settles at its own fair price, so legs may not sum to $1. No ties in NBA.",
+    "approved_on": "2026-10-10"
+  },
+  "KXNFLGAME": {
+    "kalshi": "If <TEAMS> wins the <TEAMS> vs <TEAMS> Pro Football game originally scheduled for <DATE>, then the market resolves to Yes.\nThe following market refers to the team who wins the <TEAMS> vs <TEAMS> Pro Football game originally scheduled for <DATE>. If the game ends in a tie, the market will resolve to $0.50 for each team. If the game is postponed but begins within 48 hours from its originally scheduled start time, the market will remain open and resolve based on the official final result. If the game is not started within 48 hours, the market will resolve to a fair price.\n\nKalshi is not affiliated, associated, authorized, endorsed by, or in any way officially connected with the Governing League. All trademarks, logos, and brand names are the property of their respective owners.",
+    "polymarket": "This market will settle to the winner of the <TEAMS> vs <TEAMS> NFL game scheduled for <DATE>. Overtime is included if played. If the game ends in a tie, the market will settle to $0.50. If the game is delayed, postponed, or suspended and not rescheduled to a date within two weeks of the originally scheduled date, the market will settle to the last fair market price. Outcome sourced from NFL.",
+    "note": "Postponement mismatch: Kalshi settles at fair price if not started within 48h; Polymarket waits up to two weeks, then settles at last fair market price. Legs may not offset if the game moves 2-14 days. Ties: both $0.50.",
+    "approved_on": "2026-10-10"
+  },
+  "KXNHLGAME": {
+    "kalshi": "If <TEAMS> wins the <TEAMS> vs <TEAMS> NHL game originally scheduled for <DATE>, then the market resolves to Yes.\nIf the game is postponed but begins within 48 hours of its originally scheduled start time, the market will remain open and resolve based on the official final result. If the game is cancelled or not started within 48 hours of its originally scheduled start, all markets will resolve to a fair price.",
+    "polymarket": "This market will settle to the winner of the <TEAMS> vs <TEAMS> NHL game scheduled for <DATE> at <TIME>. Overtime and any shootout are included if played. If the game is delayed, postponed, suspended, or otherwise rescheduled and is not rescheduled to start within two calendar days of the originally scheduled date and time, the market will settle to the last fair market price. Outcome sourced from NHL.",
+    "note": "Postponement windows match (Kalshi 48h; Polymarket two calendar days). Overtime and shootout count on both. If never played, each venue settles at its own fair price, so legs may not sum to $1.",
+    "approved_on": "2026-10-10"
+  }
+}

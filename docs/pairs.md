@@ -3,6 +3,26 @@
 Each row says "this Kalshi market and this Polymarket US market resolve on the same event".
 The scanner only uses rows with `verified = true` (CLAUDE.md hard rule 3).
 
+## Weekly refresh (leagues with an approved template)
+
+Once a league's rules have been reviewed, its rules text on both venues is stored in
+`data/rule_templates.json` along with the note that applies to every game. New games then only
+need mechanical checks, which one command runs:
+
+```bash
+.venv/bin/python -m altarb.mapping.refresh                              # propose (~10s)
+.venv/bin/python -m altarb.mapping.refresh --apply --verified-by Agent  # only after approval in chat
+```
+
+The first command proposes games whose rules match the approved template word for word, whose
+dates agree in both rules texts, and whose `inverted` checks out. It writes them **unverified** to
+`data/refresh.csv` and prints the list; anything else is listed under "needs review" with the reason.
+`--apply` copies the proposed rows into `pairs.csv` as verified.
+
+To approve a new league: `--show-templates KXMLBGAME` prints its rules templates for review; after
+the owner approves, `--approve-template KXMLBGAME --note "..."` records them. If a venue changes
+its wording, every game of that league lands in "needs review" until the template is re-approved.
+
 ## Finding candidates
 
 ```bash
