@@ -10,7 +10,8 @@ and build the system to capture it safely if it does.
 - [x] Polymarket US client: list markets, fetch order book (public API, no key)
 - [x] `data/pairs.csv` schema: kalshi_ticker, polymarket_slug, inverted, description, resolution_notes, expiry, verified, verified_by, verified_on (see `docs/pairs.md`)
 - [ ] Hand-verify 20–50 pairs (start with sports + major politics/econ — the most overlap)
-- [ ] Candidate matcher: suggest likely pairs from titles/dates for human review
+- [x] Candidate matcher: suggest likely pairs from titles/dates for human review (game winners; see `docs/pairs.md`)
+- [ ] Candidate matcher for non-game markets (politics, econ)
 
 ## Phase 2 — Edge calculation + data log (weeks 3–4)
 - [ ] Fee models for both venues, with unit tests

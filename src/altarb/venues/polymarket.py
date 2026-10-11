@@ -37,6 +37,7 @@ class Market:
     question: str
     description: str  # full rules text, including postponement/cancellation handling
     category: str
+    sports_market_type: str  # e.g. "moneyline", "hockey_team_full_game_winner"
     yes_label: str  # e.g. "Yes", or the team name in a two-team market
     no_label: str
     end_date: datetime | None
@@ -58,6 +59,7 @@ class Market:
             question=data.get("question", ""),
             description=data.get("description", ""),
             category=data.get("category", ""),
+            sports_market_type=data.get("sportsMarketType") or "",
             yes_label=yes.get("description", ""),
             no_label=no.get("description", ""),
             end_date=_parse_time(data.get("endDate")),

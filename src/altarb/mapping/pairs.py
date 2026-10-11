@@ -77,6 +77,25 @@ def load_pairs(path: Path | str = DEFAULT_PATH) -> list[MarketPair]:
     return pairs
 
 
+def write_pairs(path: Path | str, pairs: list[MarketPair]) -> None:
+    """Write pairs in the pairs.csv schema (used for data/candidates.csv)."""
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(COLUMNS)
+        for p in pairs:
+            writer.writerow([
+                p.kalshi_ticker,
+                p.polymarket_slug,
+                str(p.inverted).lower(),
+                p.description,
+                p.resolution_notes,
+                p.expiry.isoformat() if p.expiry else "",
+                str(p.verified).lower(),
+                p.verified_by,
+                p.verified_on.isoformat() if p.verified_on else "",
+            ])
+
+
 def verified_pairs(pairs: list[MarketPair]) -> list[MarketPair]:
     """The only pairs the scanner may use (CLAUDE.md hard rule 3)."""
     return [p for p in pairs if p.verified]

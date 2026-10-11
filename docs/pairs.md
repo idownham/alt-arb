@@ -3,6 +3,25 @@
 Each row says "this Kalshi market and this Polymarket US market resolve on the same event".
 The scanner only uses rows with `verified = true` (CLAUDE.md hard rule 3).
 
+## Finding candidates
+
+```bash
+.venv/bin/python -m altarb.mapping.matcher
+```
+
+This writes `data/candidates.csv` (not committed; regenerate any time) with suggested
+game-winner pairs in the same columns, all `verified = false`. For each one you want:
+
+1. Open both markets and work through the checklist below.
+2. Copy the row into `data/pairs.csv`, fix anything wrong, set `verified`, `verified_by`, `verified_on`.
+3. Run `.venv/bin/pytest`. It checks `pairs.csv` is still valid.
+
+Rows with `AUTO:` in `resolution_notes` need extra care (dates differ by a day, or more than one
+game matched). Replace that note with your own findings when you verify.
+
+The matcher only covers leagues listed in `src/altarb/mapping/leagues.py`. Politics, economics
+and other non-game markets aren't matched automatically yet.
+
 ## Columns
 
 | Column | Example (illustrative) | Notes |

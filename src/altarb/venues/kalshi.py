@@ -29,6 +29,7 @@ class Market:
     ticker: str
     event_ticker: str
     title: str
+    yes_sub_title: str  # the outcome YES refers to, e.g. a team name
     status: str
     rules_primary: str
     close_time: datetime | None
@@ -45,6 +46,7 @@ class Market:
             ticker=data["ticker"],
             event_ticker=data["event_ticker"],
             title=data.get("title", ""),
+            yes_sub_title=data.get("yes_sub_title") or "",
             status=data.get("status", ""),
             rules_primary=data.get("rules_primary", ""),
             close_time=_parse_time(data.get("close_time")),
