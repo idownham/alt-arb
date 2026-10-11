@@ -23,6 +23,7 @@ from typing import Any
 
 import httpx
 
+from altarb.venues.http import get_json
 from altarb.venues.models import ONE, OrderBook, PriceLevel
 
 BASE_URL = "https://gateway.polymarket.us"
@@ -148,14 +149,7 @@ class PolymarketClient:
         )
 
     def _get(self, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
-        # Polymarket's docs ask clients to back off on 429: wait 1s, 2s, 4s, ...
-        for attempt in range(self._max_retries + 1):
-            response = self._http.get(path, params=params)
-            if response.status_code != 429 or attempt == self._max_retries:
-                break
-            self._sleep(2**attempt)
-        response.raise_for_status()
-        return response.json()
+        return get_json(self._http, path, params, self._max_retries, self._sleep)
 
 
 def _parse_levels(raw: list[dict[str, Any]] | None) -> list[PriceLevel]:

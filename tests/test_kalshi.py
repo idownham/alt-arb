@@ -137,3 +137,14 @@ def test_live_fetch_markets_and_orderbook():
     assert market.ticker
     for lvl in book.yes_bids + book.no_bids:
         assert Decimal(0) < lvl.price < Decimal(1)
+
+
+def test_retries_on_429_with_backoff():
+    responses = iter([httpx.Response(429), httpx.Response(200, json={"market": MARKET})])
+    sleeps = []
+    http = httpx.Client(base_url=BASE_URL, transport=httpx.MockTransport(lambda req: next(responses)))
+
+    market = KalshiClient(http=http, sleep=sleeps.append).get_market("KXNHLGAME-26OCT16BOSANA-BOS")
+
+    assert sleeps == [1]
+    assert market.title == "Boston wins"

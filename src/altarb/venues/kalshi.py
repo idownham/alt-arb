@@ -9,7 +9,8 @@ YES ask at a level is 1 - (NO bid price), and vice versa.
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+import time
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
@@ -17,6 +18,7 @@ from typing import Any
 
 import httpx
 
+from altarb.venues.http import get_json
 from altarb.venues.models import OrderBook, PriceLevel
 
 BASE_URL = "https://api.elections.kalshi.com/trade-api/v2"
@@ -63,8 +65,12 @@ class KalshiClient:
         base_url: str = BASE_URL,
         timeout: float = 10.0,
         http: httpx.Client | None = None,
+        max_retries: int = 3,
+        sleep: Callable[[float], None] = time.sleep,
     ) -> None:
         self._http = http or httpx.Client(base_url=base_url, timeout=timeout)
+        self._max_retries = max_retries
+        self._sleep = sleep
 
     def __enter__(self) -> KalshiClient:
         return self
@@ -122,9 +128,7 @@ class KalshiClient:
         )
 
     def _get(self, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
-        response = self._http.get(path, params=params)
-        response.raise_for_status()
-        return response.json()
+        return get_json(self._http, path, params, self._max_retries, self._sleep)
 
 
 def _parse_levels(raw: list[list[str]] | None) -> list[PriceLevel]:
