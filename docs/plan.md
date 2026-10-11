@@ -15,8 +15,8 @@ and build the system to capture it safely if it does.
 
 ## Phase 2 — Edge calculation + data log (weeks 3–4)
 - [x] Fee models for both venues, with unit tests (Kalshi 0.07 base still to confirm against the fee schedule PDF)
-- [ ] Depth-aware edge: walk both books, compute fillable size and net profit at each level
-- [ ] Annualized return using time to resolution
+- [x] Depth-aware edge: walk both books, compute fillable size and net profit at each level
+- [x] Annualized return using time to resolution (simple, days floored at 1)
 - [ ] Scanner loop → SQLite: every snapshot + every opportunity above threshold
 - [ ] Switch live books to WebSockets
 - [ ] Run continuously (laptop first, then a small cloud server)
