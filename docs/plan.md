@@ -9,7 +9,7 @@ and build the system to capture it safely if it does.
 - [x] Kalshi client: list markets, fetch order book (public data)
 - [x] Polymarket US client: list markets, fetch order book (public API, no key)
 - [x] `data/pairs.csv` schema: kalshi_ticker, polymarket_slug, inverted, description, resolution_notes, expiry, verified, verified_by, verified_on (see `docs/pairs.md`)
-- [ ] Hand-verify 20–50 pairs (start with sports + major politics/econ — the most overlap)
+- [x] Hand-verify 20–50 pairs (start with sports + major politics/econ — the most overlap) — 56 NFL markets / 28 games (Oct 11–19); politics/econ not yet
 - [x] Candidate matcher: suggest likely pairs from titles/dates for human review (game winners; see `docs/pairs.md`)
 - [ ] Candidate matcher for non-game markets (politics, econ)
 
