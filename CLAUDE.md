@@ -15,7 +15,8 @@ Primary goal: a working, well-engineered system with real spread data. Trading P
 - **Kalshi** — CFTC-regulated, USD-funded. REST + WebSocket APIs; authenticated requests are RSA-PSS signed
   (`KALSHI-ACCESS-KEY`, `KALSHI-ACCESS-SIGNATURE`, `KALSHI-ACCESS-TIMESTAMP`). Docs: https://docs.kalshi.com
 - **Polymarket US** — the CFTC-regulated US exchange (NOT the international crypto exchange, which is close-only for US users).
-  Public market-data API needs no key; trading API uses Ed25519 keys and requires KYC. Docs: https://docs.polymarket.us
+  Public market-data REST needs no key; trading API uses Ed25519 keys and requires KYC. Docs: https://docs.polymarket.us
+  Both venues' WebSockets require a signed API key, even for public market data.
   Public REST is rate limited: measured ~30 req/min, then a 10s block (`Retry-After: 10`); the scanner paces
   at 2.5s/request. Use WebSockets for live order books.
 

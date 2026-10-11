@@ -18,7 +18,9 @@ and build the system to capture it safely if it does.
 - [x] Depth-aware edge: walk both books, compute fillable size and net profit at each level
 - [x] Annualized return using time to resolution (simple, days floored at 1)
 - [x] Scanner loop → SQLite: every snapshot + every opportunity above threshold (`python -m altarb.scanner`; REST, ~75s/scan)
-- [ ] Switch live books to WebSockets
+- [ ] Switch live books to WebSockets — **deferred to Phase 4 (2026-10-11):** both venues' WebSockets need
+      API keys (KYC'd accounts), even for public market data. Until then REST scans take ~75s, so gaps that
+      open and close faster than that can be missed; keep that bias in mind at Decision point A.
 - [x] Run continuously on the laptop (`scripts/scanner-service.sh`, launchd)
 - [ ] Run continuously on a small cloud server (so lid-closed / travel doesn't leave gaps)
 
