@@ -103,6 +103,13 @@ def _kalshi_games(markets: Iterable[kalshi.Market], leagues: dict[str, frozenset
     return list(games.values())
 
 
+def pm_game_key(slug: str) -> tuple[str, str, str] | None:
+    """(league, teams, date) shared by every Polymarket market of one game, e.g. a three-way game's
+    team and draw markets; None if the slug isn't a game market."""
+    match = _PM_SLUG.match(slug)
+    return (match.group(2), match.group(3), match.group(4)) if match else None
+
+
 def _pm_games(markets: Iterable[polymarket.Market]) -> list[_PMGame]:
     games: dict[tuple[str, ...], _PMGame] = {}
     for m in markets:

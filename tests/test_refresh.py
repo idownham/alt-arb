@@ -6,9 +6,13 @@ from altarb.mapping.pairs import MarketPair, load_pairs, write_pairs
 from altarb.mapping.refresh import (
     Template,
     apply,
+    _NAME_WORD,
+    _expected_inverted,
     check_pair,
+    game_templates,
     load_templates,
     observed_templates,
+    pm_siblings_of,
     propose,
     save_templates,
     team_words,
@@ -202,3 +206,70 @@ def test_team_words_cover_both_venues():
     km, pm = BOS_SJ
     words = team_words(km["KXNHLGAME-26OCT15BOSSJ-SJ"], pm)
     assert {"san", "jose", "sharks", "sjs", "bruins", "bos"} <= words
+
+
+# --- masking fixes found on real college football and Champions League rules (2026-10-13) ---
+
+
+def test_lowercase_words_are_never_team_words():
+    # Butler's Polymarket abbreviation is "but"; "Boston College" contains "college".
+    assert to_template("If the game is postponed but begins", {"butler", "but"}) == "If the game is postponed but begins"
+    words = {"boston", "college", "georgia", "tech"}
+    assert to_template("the Boston College vs Georgia Tech college football game", words) == (
+        "the <TEAMS> vs <TEAMS> college football game")
+
+
+def test_lowercase_joiners_only_inside_a_name():
+    words = {"university", "albany", "club", "atlético", "madrid"}
+    assert to_template("If University at Albany wins", words, {"at"}) == "If <TEAMS> wins"
+    assert to_template("the PSV vs Club Atlético de Madrid match", words | {"psv"}, {"de"}) == "the <TEAMS> vs <TEAMS> match"
+    assert to_template("kickoff at noon", words, {"at"}) == "kickoff at noon"
+
+
+def test_name_keeps_its_closing_parenthesis():
+    assert to_template("If Miami (OH) wins the game", {"miami", "oh"}) == "If <TEAMS> wins the game"
+    assert to_template("the Pittsburgh vs Miami (FL) college football game", {"pittsburgh", "miami", "fl"}) == (
+        "the <TEAMS> vs <TEAMS> college football game")
+
+
+def test_apostrophes_and_accents_in_names():
+    km, pm = game("HAW", "Hawai'i", team("Hawai'i", "Hawai'i", "hawaii"), "NIU", "Northern Illinois",
+                  team("Northern Illinois", "Northern Illinois", "nill"))
+    words = team_words(km["KXNHLGAME-26OCT15HAWNIU-HAW"], pm)
+    assert {"hawai'i", "northern", "illinois"} <= words
+    assert to_template("the Hawai'i vs Northern Illinois game", words) == "the <TEAMS> vs <TEAMS> game"
+    assert "fenerbahçe" in {w.lower() for w in _NAME_WORD.findall("Fenerbahçe SK")}
+
+
+def _three_way(outcome, team_data):
+    sides = [{"description": team_data["name"], "long": True, "team": team_data}] if team_data else []
+    return polymarket.Market.from_api({
+        "id": outcome, "slug": f"atc-ucl-int-sha-2026-10-21-{outcome}", "question": "?",
+        "sportsMarketType": "soccer_full_time_winner", "marketSides": sides,
+        "description": "This market will settle to the winner at the end of 90 minutes plus stoppage time in the "
+                       "FC Internazionale Milano vs FC Shakhtar Donetsk UEFA Champions League match scheduled for "
+                       "2026-10-21 3:00PM ET.",
+    })
+
+
+def test_three_way_markets_use_sibling_team_names():
+    inter = _three_way("int", team("FC Internazionale Milano", "FC Internazionale Milano", "int"))
+    shakhtar = _three_way("sha", team("FC Shakhtar Donetsk", "FC Shakhtar Donetsk", "sha"))
+    draw = _three_way("draw", None)
+    pm = {m.slug: m for m in (inter, shakhtar, draw)}
+    tie = kalshi.Market.from_api({"ticker": "KXUCLGAME-26OCT21INTSHA-TIE", "event_ticker": "KXUCLGAME-26OCT21INTSHA",
+                                  "title": "Tie", "yes_sub_title": "Tie", "rules_primary": "x"})
+    assert {m.slug for m in pm_siblings_of(draw, pm)} == {inter.slug, shakhtar.slug}
+    _, p_text = game_templates(tie, draw, pm_siblings=pm_siblings_of(draw, pm))
+    assert "in the <TEAMS> vs <TEAMS> match scheduled for <DATE> <TIME>." in p_text
+    _, alone = game_templates(tie, draw)
+    assert "Internazionale" in alone  # without siblings the draw market knows no team names
+
+
+def test_side_check_accepts_display_abbreviation():
+    # Kalshi "San Diego St." / SDSU; Polymarket names it "San Diego State", abbreviation "sdst", display "sdsu".
+    sdsu = {**team("San Diego State", "San Diego State", "sdst"), "displayAbbreviation": "SDSU"}
+    csu = {**team("Colorado State", "Colorado State", "colst"), "displayAbbreviation": "CSU"}
+    km, pm = game("SDSU", "San Diego St.", sdsu, "CSU", "Colorado St.", csu)
+    assert _expected_inverted(km["KXNHLGAME-26OCT15SDSUCSU-SDSU"], pm) is False
+    assert _expected_inverted(km["KXNHLGAME-26OCT15SDSUCSU-CSU"], pm) is True

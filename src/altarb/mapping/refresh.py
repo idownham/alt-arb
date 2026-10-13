@@ -32,7 +32,7 @@ from datetime import date, datetime
 from pathlib import Path
 
 from altarb.mapping.leagues import LEAGUES
-from altarb.mapping.matcher import fetch_markets, suggest_pairs
+from altarb.mapping.matcher import fetch_markets, pm_game_key, suggest_pairs
 from altarb.mapping.pairs import DEFAULT_PATH as PAIRS_PATH
 from altarb.mapping.pairs import MarketPair, load_pairs, write_pairs
 from altarb.venues import kalshi, polymarket
@@ -86,35 +86,57 @@ def kalshi_rules(m: kalshi.Market) -> str:
     return (m.rules_primary + "\n" + (m.raw.get("rules_secondary") or "")).strip()
 
 
-def team_words(k: kalshi.Market, p: polymarket.Market, siblings: Iterable[kalshi.Market] = ()) -> set[str]:
+_NAME_WORD = re.compile(r"[^\W_][\w'’]*")  # "Hawai'i", "Atlético", "Bodø"; no trailing "." ("St.")
+
+
+def _team_names(k: kalshi.Market, p: polymarket.Market, siblings: Iterable[kalshi.Market] = (),
+                pm_siblings: Iterable[polymarket.Market] = ()) -> list[str]:
+    kalshi_markets = [m for m in (k, *siblings) if not m.ticker.endswith("-TIE")]
+    names = [m.yes_sub_title for m in kalshi_markets] + [m.raw.get("no_sub_title") or "" for m in kalshi_markets]
+    for m in (p, *pm_siblings):
+        for side in m.raw.get("marketSides") or []:
+            team = side.get("team") or {}
+            names += [str(team.get(f) or "") for f in ("name", "safeName", "alias", "abbreviation", "displayAbbreviation")]
+    return names
+
+
+def team_words(k: kalshi.Market, p: polymarket.Market, siblings: Iterable[kalshi.Market] = (),
+               pm_siblings: Iterable[polymarket.Market] = ()) -> set[str]:
     """Every word that names a team in this game, on either venue.
 
     `siblings` are the other Kalshi markets of the same event: Kalshi's rules name both
-    teams, but each market only carries its own team's name.
+    teams, but each market only carries its own team's name. `pm_siblings` are the same
+    for Polymarket's three-way games, where each market carries one team (the draw, none).
     """
-    kalshi_markets = [m for m in (k, *siblings) if not m.ticker.endswith("-TIE")]
-    names = [m.yes_sub_title for m in kalshi_markets] + [m.raw.get("no_sub_title") or "" for m in kalshi_markets]
-    for side in p.raw.get("marketSides") or []:
-        team = side.get("team") or {}
-        names += [str(team.get(f) or "") for f in ("name", "safeName", "alias", "abbreviation", "displayAbbreviation")]
-    return {w for n in names for w in re.findall(r"[A-Za-z0-9]+", n.lower())} - _NOT_TEAM_WORDS
+    names = _team_names(k, p, siblings, pm_siblings)
+    return {w.lower() for n in names for w in _NAME_WORD.findall(n)} - _NOT_TEAM_WORDS
+
+
+def name_joiners(k: kalshi.Market, p: polymarket.Market, siblings: Iterable[kalshi.Market] = (),
+                 pm_siblings: Iterable[polymarket.Market] = ()) -> set[str]:
+    """Lowercase words inside a team name ("University at Albany", "Club Atlético de Madrid")."""
+    return {w for n in _team_names(k, p, siblings, pm_siblings) for w in _NAME_WORD.findall(n) if w[0].islower()}
 
 
 _TOKEN = re.compile(r"[^\W_][\w.'’]*|\s+|[^\w\s]")
 _JOINERS = {" ", "/", "&", "'", "’", "-", "(", ")", "."}
 
 
-def to_template(text: str, words: set[str]) -> str:
+def to_template(text: str, words: set[str], joiners: Iterable[str] = ()) -> str:
     """Strip dates, times and team names so two games of one league compare equal.
 
     A team name in rules text is often longer than the team data ("Tottenham Hotspur FC",
     "FK Bodø/Glimt", "NOLA Saints", "New York R"), so any capitalized word or number joined
     to a recognized team word counts as part of the name. Lowercase words, where the
-    substance of the rules lives ("two weeks", "extra time"), are always compared exactly.
+    substance of the rules lives ("two weeks", "extra time"), are always compared exactly:
+    a lowercase word is never a team word, even when it spells one ("but" is Butler's
+    abbreviation). The only lowercase words absorbed are `joiners` from a team's own name,
+    and only between two parts of a name ("University at Albany").
     """
     text = re.sub(_DATE, "<DATE>", text)
     text = re.sub(_TIME, "<TIME>", text)
     tokens = _TOKEN.findall(text)
+    joiners = set(joiners)
     kinds = []  # "T" team word, "C" capitalized word or number, "J" joiner, "" anything else
     sentence_start = True
     for tok in tokens:
@@ -124,11 +146,11 @@ def to_template(text: str, words: set[str]) -> str:
             sentence_start = tok.endswith((".", "?", "!", ":")) and tok not in _JOINERS - {"."}
         elif "\n" in tok:
             sentence_start = True
-        if bare in words:
+        if bare in words and not tok[0].islower():
             kinds.append("T")
         elif (tok[0].isupper() or tok.isdigit()) and not starts:  # "If", "The" opening a sentence aren't names
             kinds.append("C")
-        elif tok in _JOINERS or tok.isspace() and "\n" not in tok:
+        elif tok in _JOINERS or tok in joiners or tok.isspace() and "\n" not in tok:
             kinds.append("J")
         else:
             kinds.append("")
@@ -141,6 +163,9 @@ def to_template(text: str, words: set[str]) -> str:
                 if kinds[j] in ("T", "C"):
                     last_name = j
                 j += 1
+            name = tokens[i:last_name + 1]
+            if last_name + 1 < len(tokens) and tokens[last_name + 1] == ")" and name.count("(") > name.count(")"):
+                last_name += 1  # "Miami (OH)" keeps its closing parenthesis
             if "T" in kinds[i:last_name + 1]:
                 out.append("<TEAMS>")
                 i = last_name + 1
@@ -157,6 +182,20 @@ def siblings_of(k: kalshi.Market, km: dict[str, kalshi.Market]) -> list[kalshi.M
     return [m for m in km.values() if m.event_ticker == k.event_ticker and m.ticker != k.ticker]
 
 
+def pm_siblings_of(p: polymarket.Market, pm: dict[str, polymarket.Market]) -> list[polymarket.Market]:
+    key = pm_game_key(p.slug)
+    return [m for m in pm.values() if key and pm_game_key(m.slug) == key and m.slug != p.slug]
+
+
+def game_templates(k: kalshi.Market, p: polymarket.Market, siblings: Iterable[kalshi.Market] = (),
+                   pm_siblings: Iterable[polymarket.Market] = ()) -> tuple[str, str]:
+    """(Kalshi template, Polymarket template) for one pair."""
+    siblings, pm_siblings = list(siblings), list(pm_siblings)
+    words = team_words(k, p, siblings, pm_siblings)
+    joiners = name_joiners(k, p, siblings, pm_siblings)
+    return to_template(kalshi_rules(k), words, joiners), to_template(p.description, words, joiners)
+
+
 def observed_templates(pairs: Iterable[MarketPair], km: dict[str, kalshi.Market], pm: dict[str, polymarket.Market]) -> tuple[Counter, Counter]:
     kt, pt = Counter(), Counter()
     for (k_text, p_text), n in observed_variants(pairs, km, pm).items():
@@ -170,30 +209,29 @@ def observed_variants(pairs: Iterable[MarketPair], km: dict[str, kalshi.Market],
     variants = Counter()
     for pair in pairs:
         k, p = km[pair.kalshi_ticker], pm[pair.polymarket_slug]
-        words = team_words(k, p, siblings_of(k, km))
-        variants[(to_template(kalshi_rules(k), words), to_template(p.description, words))] += 1
+        variants[game_templates(k, p, siblings_of(k, km), pm_siblings_of(p, pm))] += 1
     return variants
 
 
 # --- per-game checks --------------------------------------------------------
 
 
-def matching_variant(k: kalshi.Market, p: polymarket.Market, templates: list[Template], siblings: Iterable[kalshi.Market] = ()) -> Template | None:
-    words = team_words(k, p, siblings)
-    k_text, p_text = to_template(kalshi_rules(k), words), to_template(p.description, words)
+def matching_variant(k: kalshi.Market, p: polymarket.Market, templates: list[Template], siblings: Iterable[kalshi.Market] = (),
+                     pm_siblings: Iterable[polymarket.Market] = ()) -> Template | None:
+    k_text, p_text = game_templates(k, p, siblings, pm_siblings)
     return next((t for t in templates if t.kalshi == k_text and t.polymarket == p_text), None)
 
 
 def check_pair(
     pair: MarketPair, k: kalshi.Market, p: polymarket.Market, templates: Template | list[Template],
-    siblings: Iterable[kalshi.Market] = (),
+    siblings: Iterable[kalshi.Market] = (), pm_siblings: Iterable[polymarket.Market] = (),
 ) -> list[str]:
     """Reasons this pair can't be proposed; empty if it passes every check."""
     templates = [templates] if isinstance(templates, Template) else templates
+    siblings, pm_siblings = list(siblings), list(pm_siblings)
     problems = []
-    if matching_variant(k, p, templates, siblings) is None:
-        words = team_words(k, p, siblings)
-        k_text, p_text = to_template(kalshi_rules(k), words), to_template(p.description, words)
+    if matching_variant(k, p, templates, siblings, pm_siblings) is None:
+        k_text, p_text = game_templates(k, p, siblings, pm_siblings)
         if not any(t.kalshi == k_text for t in templates):
             problems.append("Kalshi rules text differs from the approved template")
         if not any(t.polymarket == p_text for t in templates):
@@ -238,11 +276,16 @@ def _expected_inverted(k: kalshi.Market, p: polymarket.Market) -> bool | None:
         if code == "tie":
             return False if p.slug.endswith("-draw") else None
         team = (sides[0].get("team") or {}) if sides else {}
-        hit = code == str(team.get("abbreviation") or "").lower() or (name and name <= _team_tokens(team))
+        hit = code in _team_codes(team) or (name and name <= _team_tokens(team))
         return False if hit else None
-    hits = [s for s in sides if code == str((s.get("team") or {}).get("abbreviation") or "").lower()
+    hits = [s for s in sides if code in _team_codes(s.get("team") or {})
             or (name and name <= _team_tokens(s.get("team") or {}))]
     return (not hits[0].get("long")) if len(hits) == 1 else None
+
+
+def _team_codes(team: dict) -> set[str]:
+    """Same codes the matcher accepts: Kalshi's "SDSU" is Polymarket's displayAbbreviation, not its abbreviation "sdst"."""
+    return {str(team.get(f) or "").lower() for f in ("abbreviation", "displayAbbreviation")} - {""}
 
 
 def _team_tokens(team: dict) -> set[str]:
@@ -266,11 +309,12 @@ def propose(
             review.append(Review(pair.kalshi_ticker, pair.polymarket_slug, "league has no approved template"))
             continue
         k, p = km[pair.kalshi_ticker], pm[pair.polymarket_slug]
-        problems = check_pair(pair, k, p, variants, siblings_of(k, km))
+        siblings, pm_siblings = siblings_of(k, km), pm_siblings_of(p, pm)
+        problems = check_pair(pair, k, p, variants, siblings, pm_siblings)
         if problems:
             review.append(Review(pair.kalshi_ticker, pair.polymarket_slug, "; ".join(problems)))
         else:
-            variant = matching_variant(k, p, variants, siblings_of(k, km))
+            variant = matching_variant(k, p, variants, siblings, pm_siblings)
             ready.append(dataclasses.replace(pair, resolution_notes=variant.note))
     return ready, review
 
