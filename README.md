@@ -18,7 +18,8 @@ python3 -m venv .venv
    `data/candidates.csv` (omit `--league` for every mapped league).
 2. **Verify them** into `data/pairs.csv` following `docs/pairs.md`. For leagues with an approved
    rules template (NFL, NBA, NHL), `.venv/bin/python -m altarb.mapping.refresh` does the weekly
-   checks in one command and proposes the new games for approval.
+   checks in one command; a scheduled task runs it daily and auto-approves games that pass
+   (`verified_by = Auto`). `python -m altarb.report` checks the scanner log against the Decision A criteria.
 3. **Scan:** `.venv/bin/python -m altarb.scanner` checks every verified pair every 90s and logs to
    `data/scanner.db`. Stop with Ctrl+C. `--once` runs a single scan; `--min-profit 1` only logs
    opportunities worth more than $1.

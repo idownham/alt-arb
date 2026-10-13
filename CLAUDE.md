@@ -63,6 +63,10 @@ tests/
    Exception: an agent may record `verified = true` with `verified_by = Agent` only after presenting the full
    comparison and getting the owner's explicit approval for that specific pair in chat. `Agent` rows were
    reviewed by an agent rather than read first-hand by a human; re-check them if in doubt.
+   Exception (owner-approved 2026-10-13): the scheduled daily refresh may record `verified_by = Auto` without
+   asking, but ONLY for games that pass every check in `altarb.mapping.refresh` against a rules template the
+   owner approved (`data/rule_templates.json`). It never auto-approves "needs review" games, never approves or
+   edits a template, and commits each run with a summary. Approving a new template or variant still needs the owner.
 4. **Edge is always net of fees on both legs, sized against order-book depth** — never top-of-book alone.
 5. **Leg risk:** any execution code must define behavior for partial fills (min fill threshold, which leg fires first,
    unwind/chase policy) before it can run.
