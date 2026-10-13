@@ -9,7 +9,7 @@ and build the system to capture it safely if it does.
 - [x] Kalshi client: list markets, fetch order book (public data)
 - [x] Polymarket US client: list markets, fetch order book (public API, no key)
 - [x] `data/pairs.csv` schema: kalshi_ticker, polymarket_slug, inverted, description, resolution_notes, expiry, verified, verified_by, verified_on (see `docs/pairs.md`)
-- [x] Hand-verify 20–50 pairs (start with sports + major politics/econ — the most overlap) — 56 NFL markets / 28 games (Oct 11–19) + 76 NBA markets / 38 games (Oct 11–21) + 70 NHL markets / 35 games (Oct 11–16); politics/econ not yet
+- [x] Hand-verify 20–50 pairs (start with sports + major politics/econ — the most overlap) — 626 markets across 8 leagues by 2026-10-13 (NFL, NBA, NHL, college football, MLB, Champions League, Premier League, AFC Champions League); kept current by a daily auto-refresh (`verified_by = Auto`). Politics/econ not yet (Polymarket US lists no Trump "mention" markets)
 - [x] Candidate matcher: suggest likely pairs from titles/dates for human review (game winners; see `docs/pairs.md`)
 - [ ] Candidate matcher for non-game markets (politics, econ)
 
@@ -26,6 +26,11 @@ and build the system to capture it safely if it does.
       droplet `alt-arb` (Ubuntu 24.04) since 2026-10-13, set up with `deploy/setup.sh` (see `docs/deploy.md`).
       Verified: full scan (144 pairs, 0 errors, max leg skew 0.26s), auto-update, crash restart, reboot.
       Laptop service uninstalled.
+
+- [x] Opportunity persistence: each opportunity records `streak` (consecutive scans) and `first_seen`
+- [x] Decision point A criteria pre-registered (below) + `python -m altarb.report`
+- [x] Scan only games resolving within 72h: 149 pairs / ~104 Polymarket markets, 4.2 min per scan, max leg skew 0.22s (2026-10-13)
+- [x] Daily pair refresh scheduled (Claude desktop app, 9am): auto-verifies template-checked games, reports needs-review + report verdict
 
 **Data caveat (2026-10-13):** opportunities logged before the scanner fix (rows with
 `leg_skew_seconds IS NULL`, incl. all 41 in the laptop's `data/scanner.db`) compared books fetched minutes to
