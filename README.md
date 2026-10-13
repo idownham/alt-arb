@@ -46,11 +46,14 @@ pairs there's no need to restart: each scan reloads `data/pairs.csv`.
 -- Scan health: incomplete scans have no finished_at
 SELECT id, started_at, pairs_checked, errors FROM scans ORDER BY id DESC LIMIT 10;
 
--- Every opportunity found, best first
-SELECT ts, kalshi_ticker, kalshi_side, polymarket_side, contracts, profit, annualized_return
-FROM opportunities ORDER BY CAST(annualized_return AS REAL) DESC;
+-- Every opportunity found, best first. leg_skew_seconds IS NOT NULL excludes rows logged before
+-- 2026-10-13, when the two venues' books could be minutes apart (see storage.py). in_play = 1
+-- means the game had started: those gaps move in seconds and are much harder to capture.
+SELECT ts, in_play, kalshi_ticker, kalshi_side, polymarket_side, contracts, profit, annualized_return
+FROM opportunities WHERE leg_skew_seconds IS NOT NULL ORDER BY CAST(annualized_return AS REAL) DESC;
 
 -- How close each pair has come (hedge cost before fees; fees add ~2-3.5c, so < ~0.965 is interesting)
 SELECT kalshi_ticker, MIN(CAST(kalshi_yes_cost AS REAL)) AS best_yes, MIN(CAST(kalshi_no_cost AS REAL)) AS best_no
-FROM pair_snapshots GROUP BY kalshi_ticker ORDER BY MIN(best_yes, best_no) LIMIT 20;
+FROM pair_snapshots WHERE leg_skew_seconds IS NOT NULL
+GROUP BY kalshi_ticker ORDER BY MIN(best_yes, best_no) LIMIT 20;
 ```

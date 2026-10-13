@@ -25,6 +25,10 @@ and build the system to capture it safely if it does.
 - [ ] Run continuously on a small cloud server (so lid-closed / travel doesn't leave gaps) — deploy scripts
       ready and container-tested (`deploy/`, `docs/deploy.md`); waiting on the owner creating the server
 
+**Data caveat (2026-10-13):** opportunities logged before the scanner fix (rows with
+`leg_skew_seconds IS NULL`, incl. all 41 in the laptop's `data/scanner.db`) compared books fetched minutes to
+hours apart. They are artifacts, not edge: exclude them.
+
 **Decision point A (end of week 4):** Review the log. How often do net-positive gaps appear, how big,
 how deep, how long do they last? If edge is negligible, stop here — the system is still a finished project.
 
