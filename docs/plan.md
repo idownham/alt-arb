@@ -34,6 +34,19 @@ hours apart. They are artifacts, not edge: exclude them.
 **Decision point A (end of week 4):** Review the log. How often do net-positive gaps appear, how big,
 how deep, how long do they last? If edge is negligible, stop here — the system is still a finished project.
 
+**Decision point A criteria** — pre-registered 2026-10-13, before any clean data. Do not change them after
+looking at results; if they turn out to be wrong, say so explicitly and record the reason here.
+Run `python -m altarb.report` (mirrors these numbers in `src/altarb/report.py`).
+
+- **Enough data:** ≥ 14 days of post-fix scanning (`leg_skew_seconds IS NOT NULL`) across ≥ 3 leagues.
+- **A qualifying opportunity** is an *episode* (consecutive scans where the same pair + direction stays
+  profitable) that is **pre-game**, lasts **≥ 2 consecutive scans**, and peaks at **≥ $20** net profit
+  (net of both venues' fees, sized against depth).
+- **GO to Phase 3** if qualifying episodes average **≥ 5 per week**.
+- **STOP** if they average **< 1 per week**: the edge is negligible for this scanner.
+- **MARGINAL** in between: the cheapest further test is Phase 4's WebSockets (catches gaps shorter than a scan).
+- In-play gaps are reported but don't count toward GO: with a multi-minute scan they can't be captured reliably.
+
 ## Phase 3 — Paper trading (weeks 5–6)
 - [ ] Simulated execution against live depth, including latency between legs
 - [ ] Measure: both-legs-fill rate, slippage vs. detected edge, partial-fill frequency

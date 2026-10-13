@@ -58,6 +58,13 @@ class _PolymarketMeta:
 
 
 @dataclass
+class _Streak:
+    scan_id: int
+    count: int
+    first_seen: datetime
+
+
+@dataclass
 class ScanResult:
     pairs_checked: int = 0
     errors: int = 0
@@ -97,6 +104,10 @@ class Scanner:
         self._event_fees: dict[str, _EventFees] = {}
         self._pm_meta: dict[str, _PolymarketMeta] = {}
         self._pm_requests = 0  # for pacing: every Polymarket request after the first waits
+        # Opportunities seen in the previous scan, by (kalshi ticker, polymarket slug, kalshi side).
+        # In memory only: a restart starts every streak again at 1.
+        self._streaks: dict[tuple[str, str, str], _Streak] = {}
+        self._last_scan_id: int | None = None
 
     def scan_once(self, pairs: list[MarketPair]) -> ScanResult:
         started = self.clock()
@@ -119,6 +130,9 @@ class Scanner:
             self._scan_game(scan_id, slug, game_pairs, result)
 
         self.store.finish_scan(scan_id, self.clock(), result.pairs_checked, result.errors, result.skipped_stale)
+        # Keep only this scan's opportunities: anything not seen again has ended its streak.
+        self._streaks = {k: v for k, v in self._streaks.items() if v.scan_id == scan_id}
+        self._last_scan_id = scan_id
         return result
 
     def _scan_game(self, scan_id: int, slug: str, game_pairs: list[tuple[MarketPair, _KalshiMeta]], result: ScanResult) -> None:
@@ -168,8 +182,20 @@ class Scanner:
             in_play = pm_meta.game_start_time is not None and k_at >= pm_meta.game_start_time
             for opp in edges:
                 if opp.profit > self.min_profit:
-                    self.store.add_opportunity(scan_id, k_at, opp, skew, in_play, pm_meta.game_start_time)
+                    streak = self._extend_streak(scan_id, opp, k_at)
+                    self.store.add_opportunity(scan_id, k_at, opp, skew, in_play, pm_meta.game_start_time,
+                                               streak.count, streak.first_seen)
                     result.opportunities.append(opp)
+
+    def _extend_streak(self, scan_id: int, opp: Opportunity, at: datetime) -> _Streak:
+        key = (opp.kalshi_ticker, opp.polymarket_slug, opp.kalshi_side)
+        previous = self._streaks.get(key)
+        if previous is not None and previous.scan_id == self._last_scan_id:
+            streak = _Streak(scan_id, previous.count + 1, previous.first_seen)
+        else:
+            streak = _Streak(scan_id, 1, at)
+        self._streaks[key] = streak
+        return streak
 
     def _pace_polymarket(self) -> None:
         if self._pm_requests:

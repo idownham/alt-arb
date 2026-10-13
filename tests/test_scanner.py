@@ -308,7 +308,32 @@ def test_old_database_is_upgraded_in_place(tmp_path):
 
     s = Store(path)
 
-    assert s.conn.execute("PRAGMA user_version").fetchone() == (2,)
+    from altarb.storage import SCHEMA_VERSION
+
+    assert s.conn.execute("PRAGMA user_version").fetchone() == (SCHEMA_VERSION,)
+    assert {"streak", "first_seen"} <= {r[1] for r in s.conn.execute("PRAGMA table_info(opportunities)")}
     # Pre-fix rows are kept and identifiable by their missing skew.
     assert s.conn.execute("SELECT profit, leg_skew_seconds FROM opportunities").fetchall() == [("94677.34", None)]
     s.close()
+
+
+def test_streak_counts_consecutive_profitable_scans(store):
+    clock = Clock()
+    k_books = {"KXA-G1-A": PROFITABLE_K, "KXB-G2-B": FLAT_K}
+    scanner, *_ = make(store, k_books=k_books, clock=clock)
+
+    for _ in range(3):
+        scanner.scan_once(PAIRS)
+        clock.advance(minutes=3)
+    k_books["KXA-G1-A"] = book("KXA-G1-A", yes_asks=[("0.60", "100")])  # gap closes
+    scanner.scan_once(PAIRS)
+    clock.advance(minutes=3)
+    k_books["KXA-G1-A"] = PROFITABLE_K  # and reopens: a new streak
+    scanner.scan_once(PAIRS)
+
+    assert rows(store, "SELECT scan_id, streak, first_seen FROM opportunities ORDER BY scan_id") == [
+        (1, 1, NOW.isoformat()),
+        (2, 2, NOW.isoformat()),
+        (3, 3, NOW.isoformat()),
+        (5, 1, (NOW + timedelta(minutes=12)).isoformat()),
+    ]

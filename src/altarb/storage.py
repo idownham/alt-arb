@@ -9,6 +9,9 @@ fetched every Polymarket book first and every Kalshi book minutes later, stampin
 with the scan's start time, so its cross-venue comparisons are unreliable (most visibly during
 live games and when the Mac slept mid-scan). Version-1 rows are the ones with
 leg_skew_seconds IS NULL.
+
+Schema version 3 (2026-10-13) adds opportunities.streak / first_seen: how many consecutive scans
+the same pair and direction stayed profitable. Gaps that last a single scan are hard to trade.
 """
 
 from __future__ import annotations
@@ -72,18 +75,21 @@ CREATE TABLE IF NOT EXISTS opportunities (
     polymarket_fills TEXT NOT NULL,
     leg_skew_seconds REAL,          -- Kalshi fetch time minus Polymarket fetch time
     in_play INTEGER,                -- 1 if the game had started (per Polymarket gameStartTime)
-    game_start_time TEXT
+    game_start_time TEXT,
+    streak INTEGER,                 -- consecutive scans this pair+direction has been profitable (1 = new)
+    first_seen TEXT                 -- when the current streak started
 );
 CREATE INDEX IF NOT EXISTS opportunities_by_pair ON opportunities (kalshi_ticker, polymarket_slug, ts);
 CREATE INDEX IF NOT EXISTS pair_snapshots_by_pair ON pair_snapshots (kalshi_ticker, polymarket_slug, ts);
 """
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 # Columns added after version 1, so older databases can be upgraded in place.
 _ADDED_COLUMNS = {
     "scans": [("skipped_stale", "INTEGER NOT NULL DEFAULT 0")],
     "pair_snapshots": [("leg_skew_seconds", "REAL")],
-    "opportunities": [("leg_skew_seconds", "REAL"), ("in_play", "INTEGER"), ("game_start_time", "TEXT")],
+    "opportunities": [("leg_skew_seconds", "REAL"), ("in_play", "INTEGER"), ("game_start_time", "TEXT"),
+                      ("streak", "INTEGER"), ("first_seen", "TEXT")],
 }
 
 
@@ -138,19 +144,21 @@ class Store:
     def add_opportunity(
         self, scan_id: int, at: datetime, o: Opportunity, leg_skew_seconds: float | None = None,
         in_play: bool | None = None, game_start_time: datetime | None = None,
+        streak: int | None = None, first_seen: datetime | None = None,
     ) -> None:
         self.conn.execute(
             """INSERT INTO opportunities (scan_id, ts, kalshi_ticker, polymarket_slug, kalshi_side,
                polymarket_side, contracts, kalshi_cost, polymarket_cost, profit, return_on_capital,
                annualized_return, days_to_resolution, kalshi_fills, polymarket_fills,
-               leg_skew_seconds, in_play, game_start_time)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               leg_skew_seconds, in_play, game_start_time, streak, first_seen)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (scan_id, at.isoformat(), o.kalshi_ticker, o.polymarket_slug, o.kalshi_side, o.polymarket_side,
              str(o.contracts), str(o.kalshi_cost), str(o.polymarket_cost), str(o.profit),
              str(o.return_on_capital), str(o.annualized_return), str(o.days_to_resolution),
              _fills_json(o.kalshi_fills), _fills_json(o.polymarket_fills),
              leg_skew_seconds, None if in_play is None else int(in_play),
-             game_start_time.isoformat() if game_start_time else None),
+             game_start_time.isoformat() if game_start_time else None,
+             streak, first_seen.isoformat() if first_seen else None),
         )
 
     def commit(self) -> None:
