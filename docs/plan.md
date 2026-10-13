@@ -22,8 +22,10 @@ and build the system to capture it safely if it does.
       API keys (KYC'd accounts), even for public market data. Until then REST scans take ~75s, so gaps that
       open and close faster than that can be missed; keep that bias in mind at Decision point A.
 - [x] Run continuously on the laptop (`scripts/scanner-service.sh`, launchd)
-- [ ] Run continuously on a small cloud server (so lid-closed / travel doesn't leave gaps) — deploy scripts
-      ready and container-tested (`deploy/`, `docs/deploy.md`); waiting on the owner creating the server
+- [x] Run continuously on a small cloud server (so lid-closed / travel doesn't leave gaps) — DigitalOcean
+      droplet `alt-arb` (Ubuntu 24.04) since 2026-10-13, set up with `deploy/setup.sh` (see `docs/deploy.md`).
+      Verified: full scan (144 pairs, 0 errors, max leg skew 0.26s), auto-update, crash restart, reboot.
+      Laptop service uninstalled.
 
 **Data caveat (2026-10-13):** opportunities logged before the scanner fix (rows with
 `leg_skew_seconds IS NULL`, incl. all 41 in the laptop's `data/scanner.db`) compared books fetched minutes to
