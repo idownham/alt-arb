@@ -337,3 +337,14 @@ def test_streak_counts_consecutive_profitable_scans(store):
         (3, 3, NOW.isoformat()),
         (5, 1, (NOW + timedelta(minutes=12)).isoformat()),
     ]
+
+
+def test_only_scans_games_within_the_horizon(store):
+    scanner, k, p, *_ = make(store, kalshi={"resolves": NOW + timedelta(days=5)}, horizon=timedelta(hours=72))
+
+    result = scanner.scan_once(PAIRS)
+
+    assert result.pairs_checked == 0 and p.calls["book"] == 0  # 5 days out: skipped for now
+    k.resolves = NOW + timedelta(hours=10)
+    scanner._kalshi_meta.clear()
+    assert scanner.scan_once(PAIRS).pairs_checked == 2  # within 72h: scanned

@@ -16,7 +16,7 @@ chat (CLAUDE.md rule 3). Only then does `--apply` copy them into data/pairs.csv.
     python -m altarb.mapping.refresh                                # propose (approved leagues)
     python -m altarb.mapping.refresh --apply --verified-by Agent    # after approval in chat
     python -m altarb.mapping.refresh --show-templates KXMLBGAME     # review a new league
-    python -m altarb.mapping.refresh --approve-template KXMLBGAME --note "..."  # after approval
+    python -m altarb.mapping.refresh --approve-template KXMLBGAME --variant 1 --note "..."  # after approval
 """
 
 from __future__ import annotations
@@ -40,7 +40,11 @@ from altarb.venues import kalshi, polymarket
 TEMPLATES_PATH = PAIRS_PATH.with_name("rule_templates.json")
 PROPOSAL_PATH = PAIRS_PATH.with_name("refresh.csv")
 
-_DATE = r"(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.? \d{1,2}, \d{4}"
+_DATE = r"(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.? \d{1,2}, \d{4}|\d{4}-\d{2}-\d{2})"
+# Ordinary words that also appear in some team names ("Texas A&M", Kalshi's "Tie" market, "The ...").
+# Treating them as team names would blank them out of the rules text, e.g. "resolve to a fair price".
+_NOT_TEAM_WORDS = {"the", "of", "and", "a", "tie", "draw", "yes", "no", "not", "will", "for", "in", "at", "on",
+                   "to", "by", "or", "if", "is", "be", "an", "as", "it"}
 _TIME = r"\d{1,2}:\d{2} ?(?:AM|PM)(?: (?:ET|UTC))?"
 _SCHEDULED_DATE = re.compile(rf"scheduled for ({_DATE})")
 
@@ -63,16 +67,18 @@ class Review:
 # --- templates --------------------------------------------------------------
 
 
-def load_templates(path: Path | str = TEMPLATES_PATH) -> dict[str, Template]:
+def load_templates(path: Path | str = TEMPLATES_PATH) -> dict[str, list[Template]]:
+    """Approved template variants per league. A league can have several (e.g. soccer's team and tie
+    markets use different wording); a game must match one of them exactly."""
     try:
         raw = json.loads(Path(path).read_text(encoding="utf-8"))
     except FileNotFoundError:
         return {}
-    return {series: Template(**t) for series, t in raw.items()}
+    return {series: [Template(**t) for t in (v if isinstance(v, list) else [v])] for series, v in raw.items()}
 
 
-def save_templates(templates: dict[str, Template], path: Path | str = TEMPLATES_PATH) -> None:
-    data = {s: dataclasses.asdict(t) for s, t in sorted(templates.items())}
+def save_templates(templates: dict[str, list[Template]], path: Path | str = TEMPLATES_PATH) -> None:
+    data = {s: [dataclasses.asdict(t) for t in ts] for s, ts in sorted(templates.items())}
     Path(path).write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
 
 
@@ -86,21 +92,65 @@ def team_words(k: kalshi.Market, p: polymarket.Market, siblings: Iterable[kalshi
     `siblings` are the other Kalshi markets of the same event: Kalshi's rules name both
     teams, but each market only carries its own team's name.
     """
-    names = [m.yes_sub_title for m in (k, *siblings)] + [k.raw.get("no_sub_title") or ""]
+    kalshi_markets = [m for m in (k, *siblings) if not m.ticker.endswith("-TIE")]
+    names = [m.yes_sub_title for m in kalshi_markets] + [m.raw.get("no_sub_title") or "" for m in kalshi_markets]
     for side in p.raw.get("marketSides") or []:
         team = side.get("team") or {}
         names += [str(team.get(f) or "") for f in ("name", "safeName", "alias", "abbreviation", "displayAbbreviation")]
-    return {w for n in names for w in re.findall(r"[A-Za-z0-9]+", n.lower())}
+    return {w for n in names for w in re.findall(r"[A-Za-z0-9]+", n.lower())} - _NOT_TEAM_WORDS
+
+
+_TOKEN = re.compile(r"[^\W_][\w.'’]*|\s+|[^\w\s]")
+_JOINERS = {" ", "/", "&", "'", "’", "-", "(", ")", "."}
 
 
 def to_template(text: str, words: set[str]) -> str:
-    """Strip dates, times and team names so two games of one league compare equal."""
+    """Strip dates, times and team names so two games of one league compare equal.
+
+    A team name in rules text is often longer than the team data ("Tottenham Hotspur FC",
+    "FK Bodø/Glimt", "NOLA Saints", "New York R"), so any capitalized word or number joined
+    to a recognized team word counts as part of the name. Lowercase words, where the
+    substance of the rules lives ("two weeks", "extra time"), are always compared exactly.
+    """
     text = re.sub(_DATE, "<DATE>", text)
     text = re.sub(_TIME, "<TIME>", text)
-    text = re.sub(r"[A-Za-z0-9]+(?:\.|'s)?", lambda m: "<T>" if m.group(0).lower().rstrip(".").removesuffix("'s") in words else m.group(0), text)
-    # Absorb venue-specific name fragments the team data doesn't contain: a short capitalized
-    # prefix ("NOLA Saints", "LA Clippers") and a single trailing letter ("New York R" = Rangers).
-    return re.sub(r"(?:\b[A-Z]{1,4} )?<T>(?:[ .()&-]*<T>)*(?: [A-Z]\b)?", "<TEAMS>", text)
+    tokens = _TOKEN.findall(text)
+    kinds = []  # "T" team word, "C" capitalized word or number, "J" joiner, "" anything else
+    sentence_start = True
+    for tok in tokens:
+        bare = tok.lower().rstrip(".").removesuffix("'s").removesuffix("’s")
+        starts = sentence_start and not tok.isspace()
+        if not tok.isspace():
+            sentence_start = tok.endswith((".", "?", "!", ":")) and tok not in _JOINERS - {"."}
+        elif "\n" in tok:
+            sentence_start = True
+        if bare in words:
+            kinds.append("T")
+        elif (tok[0].isupper() or tok.isdigit()) and not starts:  # "If", "The" opening a sentence aren't names
+            kinds.append("C")
+        elif tok in _JOINERS or tok.isspace() and "\n" not in tok:
+            kinds.append("J")
+        else:
+            kinds.append("")
+    out, i = [], 0
+    while i < len(tokens):
+        if kinds[i] in ("T", "C"):
+            # Extend over name-like tokens and the joiners between them.
+            j, last_name = i, i
+            while j < len(tokens) and kinds[j] in ("T", "C", "J"):
+                if kinds[j] in ("T", "C"):
+                    last_name = j
+                j += 1
+            if "T" in kinds[i:last_name + 1]:
+                out.append("<TEAMS>")
+                i = last_name + 1
+                continue
+            out.extend(tokens[i:last_name + 1])
+            i = last_name + 1
+            continue
+        out.append(tokens[i])
+        i += 1
+    return "".join(out)
 
 
 def siblings_of(k: kalshi.Market, km: dict[str, kalshi.Market]) -> list[kalshi.Market]:
@@ -109,27 +159,47 @@ def siblings_of(k: kalshi.Market, km: dict[str, kalshi.Market]) -> list[kalshi.M
 
 def observed_templates(pairs: Iterable[MarketPair], km: dict[str, kalshi.Market], pm: dict[str, polymarket.Market]) -> tuple[Counter, Counter]:
     kt, pt = Counter(), Counter()
+    for (k_text, p_text), n in observed_variants(pairs, km, pm).items():
+        kt[k_text] += n
+        pt[p_text] += n
+    return kt, pt
+
+
+def observed_variants(pairs: Iterable[MarketPair], km: dict[str, kalshi.Market], pm: dict[str, polymarket.Market]) -> Counter:
+    """How many pairs use each (Kalshi template, Polymarket template) combination."""
+    variants = Counter()
     for pair in pairs:
         k, p = km[pair.kalshi_ticker], pm[pair.polymarket_slug]
         words = team_words(k, p, siblings_of(k, km))
-        kt[to_template(kalshi_rules(k), words)] += 1
-        pt[to_template(p.description, words)] += 1
-    return kt, pt
+        variants[(to_template(kalshi_rules(k), words), to_template(p.description, words))] += 1
+    return variants
 
 
 # --- per-game checks --------------------------------------------------------
 
 
+def matching_variant(k: kalshi.Market, p: polymarket.Market, templates: list[Template], siblings: Iterable[kalshi.Market] = ()) -> Template | None:
+    words = team_words(k, p, siblings)
+    k_text, p_text = to_template(kalshi_rules(k), words), to_template(p.description, words)
+    return next((t for t in templates if t.kalshi == k_text and t.polymarket == p_text), None)
+
+
 def check_pair(
-    pair: MarketPair, k: kalshi.Market, p: polymarket.Market, template: Template, siblings: Iterable[kalshi.Market] = ()
+    pair: MarketPair, k: kalshi.Market, p: polymarket.Market, templates: Template | list[Template],
+    siblings: Iterable[kalshi.Market] = (),
 ) -> list[str]:
     """Reasons this pair can't be proposed; empty if it passes every check."""
+    templates = [templates] if isinstance(templates, Template) else templates
     problems = []
-    words = team_words(k, p, siblings)
-    if to_template(kalshi_rules(k), words) != template.kalshi:
-        problems.append("Kalshi rules text differs from the approved template")
-    if to_template(p.description, words) != template.polymarket:
-        problems.append("Polymarket rules text differs from the approved template")
+    if matching_variant(k, p, templates, siblings) is None:
+        words = team_words(k, p, siblings)
+        k_text, p_text = to_template(kalshi_rules(k), words), to_template(p.description, words)
+        if not any(t.kalshi == k_text for t in templates):
+            problems.append("Kalshi rules text differs from the approved template")
+        if not any(t.polymarket == p_text for t in templates):
+            problems.append("Polymarket rules text differs from the approved template")
+        if not problems:
+            problems.append("this combination of Kalshi and Polymarket rules text isn't an approved variant")
     if pair.resolution_notes:
         problems.append(f"matcher flagged it: {pair.resolution_notes}")
 
@@ -152,7 +222,7 @@ def _scheduled_date(text: str) -> date | None:
     if not match:
         return None
     raw = match.group(1).replace(".", "").replace("Sept ", "Sep ")
-    for fmt in ("%b %d, %Y", "%B %d, %Y"):
+    for fmt in ("%b %d, %Y", "%B %d, %Y", "%Y-%m-%d"):
         try:
             return datetime.strptime(raw, fmt).date()
         except ValueError:
@@ -186,21 +256,22 @@ def propose(
     candidates: Iterable[MarketPair],
     km: dict[str, kalshi.Market],
     pm: dict[str, polymarket.Market],
-    templates: dict[str, Template],
+    templates: dict[str, list[Template]],
 ) -> tuple[list[MarketPair], list[Review]]:
     ready, review = [], []
     for pair in candidates:
         series = pair.kalshi_ticker.split("-")[0]
-        template = templates.get(series)
-        if template is None:
+        variants = templates.get(series)
+        if not variants:
             review.append(Review(pair.kalshi_ticker, pair.polymarket_slug, "league has no approved template"))
             continue
-        k = km[pair.kalshi_ticker]
-        problems = check_pair(pair, k, pm[pair.polymarket_slug], template, siblings_of(k, km))
+        k, p = km[pair.kalshi_ticker], pm[pair.polymarket_slug]
+        problems = check_pair(pair, k, p, variants, siblings_of(k, km))
         if problems:
             review.append(Review(pair.kalshi_ticker, pair.polymarket_slug, "; ".join(problems)))
         else:
-            ready.append(dataclasses.replace(pair, resolution_notes=template.note))
+            variant = matching_variant(k, p, variants, siblings_of(k, km))
+            ready.append(dataclasses.replace(pair, resolution_notes=variant.note))
     return ready, review
 
 
@@ -248,6 +319,7 @@ def main() -> None:
     parser.add_argument("--verified-by", help="name recorded with --apply, e.g. Agent or Ian")
     parser.add_argument("--show-templates", metavar="KALSHI_SERIES", help="print a league's observed rules templates")
     parser.add_argument("--approve-template", metavar="KALSHI_SERIES", help="record a league's current template (after approval)")
+    parser.add_argument("--variant", type=int, help="which variant to approve (number shown by --show-templates)")
     parser.add_argument("--note", help="resolution note for --approve-template")
     args = parser.parse_args()
     templates = load_templates()
@@ -265,20 +337,24 @@ def main() -> None:
             parser.error(f"{series} is not in leagues.py")
         km, pm = _fetch([series])
         pairs = suggest_pairs(km.values(), pm.values())
-        kt, pt = observed_templates(pairs, km, pm)
-        print(f"{series}: {len(pairs)} matched markets")
-        for venue, counter in (("KALSHI", kt), ("POLYMARKET", pt)):
-            print(f"\n{venue}: {len(counter)} template(s)")
-            for text, n in counter.most_common():
-                print(f"--- used by {n}:\n{text}")
+        variants = observed_variants(pairs, km, pm).most_common()
+        approved = {(t.kalshi, t.polymarket) for t in templates.get(series, [])}
+        print(f"{series}: {len(pairs)} matched markets, {len(variants)} rules variant(s)")
+        for i, ((k_text, p_text), n) in enumerate(variants, 1):
+            status = "APPROVED" if (k_text, p_text) in approved else "not approved"
+            print(f"\n=== variant {i}: {n} market(s), {status}\n--- KALSHI:\n{k_text}\n--- POLYMARKET:\n{p_text}")
         if args.approve_template:
-            if len(kt) != 1 or len(pt) != 1:
-                raise SystemExit("\nRefusing: each venue must have exactly one template to approve.")
+            if not args.variant or not 1 <= args.variant <= len(variants):
+                parser.error("--approve-template needs --variant N (a number from the list above)")
             if not args.note:
                 parser.error("--approve-template needs --note")
-            templates[series] = Template(next(iter(kt)), next(iter(pt)), args.note, date.today().isoformat())
+            k_text, p_text = variants[args.variant - 1][0]
+            if (k_text, p_text) in approved:
+                print(f"\nVariant {args.variant} is already approved.")
+                return
+            templates.setdefault(series, []).append(Template(k_text, p_text, args.note, date.today().isoformat()))
             save_templates(templates)
-            print(f"\nApproved template for {series} saved to {TEMPLATES_PATH}")
+            print(f"\nApproved variant {args.variant} for {series}; saved to {TEMPLATES_PATH}")
         return
 
     series = args.league or sorted(templates)

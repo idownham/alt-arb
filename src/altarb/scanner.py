@@ -34,6 +34,9 @@ METADATA_TTL = timedelta(hours=1)
 
 
 MAX_LEG_SKEW_SECONDS = 5.0  # both venues' books must be fetched within this window to compare them
+# Only scan games resolving within this window. Near-term games carry most of the volume, and
+# every extra Polymarket game costs 2.5s per scan (the rate limit), lengthening every scan.
+HORIZON = timedelta(hours=72)
 
 
 @dataclass
@@ -89,6 +92,7 @@ class Scanner:
         min_profit: Decimal = Decimal(0),
         polymarket_pace: float = POLYMARKET_PACE_SECONDS,
         max_leg_skew: float = MAX_LEG_SKEW_SECONDS,
+        horizon: timedelta = HORIZON,
         sleep: Callable[[float], None] = time.sleep,
         clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
     ) -> None:
@@ -98,6 +102,7 @@ class Scanner:
         self.min_profit = min_profit
         self.polymarket_pace = polymarket_pace
         self.max_leg_skew = max_leg_skew
+        self.horizon = horizon
         self.sleep = sleep
         self.clock = clock
         self._kalshi_meta: dict[str, _KalshiMeta] = {}
@@ -123,7 +128,7 @@ class Scanner:
                 result.errors += 1
                 log.warning("kalshi market %s: %s", pair.kalshi_ticker, e)
                 continue
-            if meta.resolves_at > started:
+            if started < meta.resolves_at <= started + self.horizon:
                 games[pair.polymarket_slug].append((pair, meta))
 
         for slug, game_pairs in sorted(games.items()):
@@ -248,6 +253,8 @@ def main() -> None:
     parser.add_argument("--interval", type=float, default=90, help="seconds between scan starts (default 90)")
     parser.add_argument("--once", action="store_true", help="run a single scan and exit")
     parser.add_argument("--db", default=None, help="SQLite path (default data/scanner.db)")
+    parser.add_argument("--horizon-hours", type=float, default=HORIZON.total_seconds() / 3600,
+                        help="only scan games resolving within this many hours (default 72)")
     parser.add_argument("--min-profit", type=Decimal, default=Decimal(0), help="only log opportunities above this $ profit")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -257,7 +264,7 @@ def main() -> None:
     # Treat SIGTERM (what `kill` and service managers send) like Ctrl+C: finish cleanly.
     signal.signal(signal.SIGTERM, signal.default_int_handler)
     with KalshiClient(max_retries=6) as k, PolymarketClient(max_retries=6) as p:
-        scanner = Scanner(k, p, store, min_profit=args.min_profit)
+        scanner = Scanner(k, p, store, min_profit=args.min_profit, horizon=timedelta(hours=args.horizon_hours))
         try:
             while True:
                 started = time.monotonic()

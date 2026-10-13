@@ -67,15 +67,19 @@ def template_from(*games):
 def test_different_games_share_one_template():
     kt, pt, *_ = template_from(BOS_SJ, NYR_NJ)
     assert len(kt) == 1 and len(pt) == 1
-    assert "If <TEAMS> wins the <TEAMS> vs <TEAMS> NHL game originally scheduled for <DATE>" in next(iter(kt))
+    assert "If <TEAMS> wins the <TEAMS> vs <TEAMS> game originally scheduled for <DATE>" in next(iter(kt))
 
 
 def test_name_fragments_absorbed():
     # "New York R" (Rangers) and "NOLA Saints": fragments not in the team data.
     words = {"rangers", "saints", "new", "york", "nyr", "orleans", "no"}
     assert to_template("the New York R vs NOLA Saints game", words) == "the <TEAMS> vs <TEAMS> game"
-    # ...but a real league word next to a team is kept.
-    assert to_template("Saints NFL game", {"saints"}) == "<TEAMS> NFL game"
+    # Trade-off: any capitalized word joined to a team name counts as part of it ("Tottenham Hotspur
+    # FC"), so a league acronym right after a team is absorbed too. Lowercase words still compare.
+    assert to_template("the Saints NFL game", {"saints"}) == "the <TEAMS> game"
+    assert to_template("the Tottenham Hotspur FC vs Brighton & Hove Albion match", {"tottenham", "brighton"}) == (
+        "the <TEAMS> vs <TEAMS> match")
+    assert to_template("If Boston wins. The market", {"boston"}) == "If <TEAMS> wins. The market"
 
 
 @pytest.fixture
@@ -132,7 +136,7 @@ def test_propose_splits_ready_and_review(approved):
     good = pair("KXNHLGAME-26OCT15BOSSJ-BOS", BOS_SJ[1].slug, False)
     bad = pair("KXNHLGAME-26OCT15BOSSJ-SJ", BOS_SJ[1].slug, False)
 
-    ready, review = propose([good, bad, other], {**km, other.kalshi_ticker: km[good.kalshi_ticker]}, pm, {"KXNHLGAME": t})
+    ready, review = propose([good, bad, other], {**km, other.kalshi_ticker: km[good.kalshi_ticker]}, pm, {"KXNHLGAME": [t]})
     # (propose finds each market's sibling itself, by event ticker)
 
     assert [r.kalshi_ticker for r in ready] == [good.kalshi_ticker]
@@ -163,8 +167,35 @@ def test_apply_marks_verified_and_skips_existing(tmp_path):
 def test_templates_round_trip(tmp_path):
     path = tmp_path / "t.json"
     assert load_templates(path) == {}
-    save_templates({"KXNHLGAME": Template("k", "p", "note", "2026-10-10")}, path)
-    assert load_templates(path) == {"KXNHLGAME": Template("k", "p", "note", "2026-10-10")}
+    save_templates({"KXNHLGAME": [Template("k", "p", "note", "2026-10-10")]}, path)
+    assert load_templates(path) == {"KXNHLGAME": [Template("k", "p", "note", "2026-10-10")]}
+
+
+def test_old_single_template_files_still_load(tmp_path):
+    import json
+
+    path = tmp_path / "t.json"
+    path.write_text(json.dumps({"KXNHLGAME": {"kalshi": "k", "polymarket": "p", "note": "n", "approved_on": "d"}}))
+    assert load_templates(path) == {"KXNHLGAME": [Template("k", "p", "n", "d")]}
+
+
+def test_game_matching_second_variant_gets_that_variants_note(approved):
+    t, km, pm = approved
+    other = Template("some other Kalshi wording", "some other Polymarket wording", "other note", "2026-10-13")
+    good = pair("KXNHLGAME-26OCT15BOSSJ-BOS", BOS_SJ[1].slug, False)
+
+    ready, review = propose([good], km, pm, {"KXNHLGAME": [other, t]})
+
+    assert review == [] and ready[0].resolution_notes == "NHL note"
+
+
+def test_iso_dates_and_common_words():
+    words = {"tie", "the"} - {"tie", "the"}  # team_words drops these; simulate its output
+    text = "If the game ends in a tie, the market resolves; match scheduled for 2026-10-13 19:00 UTC"
+    assert to_template(text, words | {"arsenal"}) == (
+        "If the game ends in a tie, the market resolves; match scheduled for <DATE> 19:00 UTC")
+    from altarb.mapping.refresh import _scheduled_date
+    assert _scheduled_date("match scheduled for 2026-10-13 at 7:00PM") == date(2026, 10, 13)
 
 
 def test_team_words_cover_both_venues():
