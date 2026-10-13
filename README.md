@@ -1,4 +1,4 @@
-# alt-arb
+# alt-arb — Project Osprey
 
 Finds cross-venue arbitrage between Kalshi and Polymarket US. Read-only for now: nothing places orders.
 See `CLAUDE.md` for the rules and `docs/plan.md` for the roadmap.
