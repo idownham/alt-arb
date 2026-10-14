@@ -45,3 +45,10 @@ auto-verified pairs (`verified_by = Auto`) and pushes to `main` without a human 
 
 **Rule:** `main` can move under you. Always `git pull --rebase` before every push, from the laptop and
 any agent session alike, and never force-push `main`.
+
+## 2026-10-14 — Laptop folder moved to `~/code/alt/project-osprey`
+
+**What changed:** Ian moved this repo's laptop checkout from `~/code/alt-arb` to `~/code/alt/project-osprey`
+(HQ decision, same date). The GitHub repo (`idownham/alt-arb`) and the droplet path (`/opt/alt-arb`) are unchanged.
+The `.venv` was rebuilt (`pip install -e '.[dev]'`, 165 tests pass) and the daily-refresh scheduled task's prompt
+now uses the new path.
