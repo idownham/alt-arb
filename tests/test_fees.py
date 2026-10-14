@@ -94,6 +94,25 @@ def test_kalshi_taker_fee_peaks_at_half():
     assert kalshi_fee(D(100), D("0.50"), STANDARD) == D("1.750000")
 
 
+# Kalshi fee schedule PDF ("General Trading Fees Table", effective 2026-07-07): price -> fee for
+# 1 contract and for 100 contracts, which is the 0.07 taker fee rounded up to the cent.
+KALSHI_PDF_TABLE = [
+    ("0.01", "0.01", "0.07"), ("0.05", "0.01", "0.34"), ("0.10", "0.01", "0.63"), ("0.15", "0.01", "0.90"),
+    ("0.20", "0.02", "1.12"), ("0.25", "0.02", "1.32"), ("0.30", "0.02", "1.47"), ("0.35", "0.02", "1.60"),
+    ("0.40", "0.02", "1.68"), ("0.45", "0.02", "1.74"), ("0.50", "0.02", "1.75"), ("0.55", "0.02", "1.74"),
+    ("0.60", "0.02", "1.68"), ("0.65", "0.02", "1.60"), ("0.70", "0.02", "1.47"), ("0.75", "0.02", "1.32"),
+    ("0.80", "0.02", "1.12"), ("0.85", "0.01", "0.90"), ("0.90", "0.01", "0.63"), ("0.95", "0.01", "0.34"),
+    ("0.99", "0.01", "0.07"),
+]
+
+
+@pytest.mark.parametrize(("price", "fee_1", "fee_100"), KALSHI_PDF_TABLE)
+def test_kalshi_fee_matches_published_table(price, fee_1, fee_100):
+    for contracts, fee in ((D(1), fee_1), (D(100), fee_100)):
+        cost = kalshi_order_buy_cost([(contracts, D(price))], STANDARD)
+        assert cost - contracts * D(price) == D(fee)
+
+
 def test_kalshi_fee_rounds_up_to_micro_dollar():
     # 0.07 x 1 x 0.33 x 0.67 = 0.015477 exactly
     assert kalshi_fee(D(1), D("0.33"), STANDARD) == D("0.015477")

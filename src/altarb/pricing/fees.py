@@ -15,9 +15,11 @@ Kalshi (docs.kalshi.com/getting_started/fee_rounding, series fee_type):
     quadratic_with_combo_maker_fees, nothing under quadratic.
     Each fill's fee is rounded up to $0.000001; a retail (non-direct) account's
     balance moves in whole cents, so an order's total cash out rounds up to the cent.
-    NOTE: the 0.07 base coefficient comes from CLAUDE.md and is consistent with
-    the API docs' maker ratios, but has not been re-checked against Kalshi's fee
-    schedule PDF (kalshi.com/docs/kalshi-fee-schedule.pdf), which blocks automated download.
+    The 0.07 base and the 0.0175 (= 0.25 x 0.07) maker rate match Kalshi's fee schedule
+    PDF (kalshi.com/docs/kalshi-fee-schedule.pdf, effective 2026-07-07; checked 2026-10-13).
+    Its fee table is pinned in tests/test_fees.py. The PDF rounds fee + position cost up to
+    a centicent; retail cash moves in cents, so rounding the order total up to the cent is
+    never optimistic.
     `flat` fees are in that PDF only and are deliberately unsupported.
 
 Polymarket's monthly taker-volume rebates are ignored (conservative).
@@ -39,7 +41,7 @@ POLYMARKET_TAKER = Decimal("0.0695")
 POLYMARKET_TAKER_TABLE_TENNIS = Decimal("0.10")
 POLYMARKET_MAKER_REBATE = Decimal("0.0125")
 
-KALSHI_TAKER = Decimal("0.07")  # unconfirmed against the fee schedule PDF; see module docstring
+KALSHI_TAKER = Decimal("0.07")  # Kalshi fee schedule PDF, effective 2026-07-07
 KALSHI_MAKER_RATIO = {
     "quadratic": Decimal("0"),
     "quadratic_with_maker_fees": Decimal("0.25"),

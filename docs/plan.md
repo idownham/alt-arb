@@ -14,7 +14,7 @@ and build the system to capture it safely if it does.
 - [ ] Candidate matcher for non-game markets (politics, econ)
 
 ## Phase 2 — Edge calculation + data log (weeks 3–4)
-- [x] Fee models for both venues, with unit tests (Kalshi 0.07 base still to confirm against the fee schedule PDF)
+- [x] Fee models for both venues, with unit tests (Kalshi 0.07 base confirmed against the fee schedule PDF, 2026-10-13)
 - [x] Depth-aware edge: walk both books, compute fillable size and net profit at each level
 - [x] Annualized return using time to resolution (simple, days floored at 1)
 - [x] Scanner loop → SQLite: every snapshot + every opportunity above threshold (`python -m altarb.scanner`; REST, ~75s/scan)

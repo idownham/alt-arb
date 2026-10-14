@@ -27,7 +27,8 @@ the thresholds after seeing data; if they must change, record why in the plan fi
   (`quadratic_with_combo_maker_fees`) or zero (`quadratic`). `flat` is unmodeled — skip those markets.
   Fee rounds up to $0.000001; a retail order's total cash rounds up to the cent.
   Fetch `fee_type`/`M` from the series AND apply scheduled event overrides (`/events/fee_changes`) — never hardcode.
-  The 0.07 base is not yet re-checked against kalshi.com/docs/kalshi-fee-schedule.pdf (blocks automated download).
+  The 0.07 base and 0.0175 maker rate are confirmed against kalshi.com/docs/kalshi-fee-schedule.pdf
+  (effective 2026-07-07, checked 2026-10-13; the PDF blocks automated download, so the owner fetches it).
 - Polymarket US (effective 2026-10-07): `Θ × C × p × (1 − p)`, banker's-rounded to the cent. Θ = 0.0695 taker
   (0.10 table tennis); makers get a 0.0125 rebate. Docs: https://docs.polymarket.us/fees
 
