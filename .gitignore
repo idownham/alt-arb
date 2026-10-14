@@ -12,3 +12,4 @@ data/*.log
 *.db-wal
 *.db-shm
 data/refresh.csv
+data/refresh_last.json

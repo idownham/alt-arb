@@ -35,6 +35,13 @@ Data stays on the server in `/opt/alt-arb/data/scanner.db`.
 
 ## Day to day
 
+Quick health check from the laptop (needs `DROPLET_HOST=root@<server-ip>` in `.env`; exit code 0 = healthy,
+1 = needs attention). It also reports the last daily pair refresh, which runs on the laptop:
+
+```bash
+python -m altarb.status
+```
+
 ```bash
 ssh root@<server-ip> journalctl -u altarb-scanner -f          # live log
 ssh root@<server-ip> journalctl -u altarb-update --since today # what auto-update did

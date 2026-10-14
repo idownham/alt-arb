@@ -28,7 +28,7 @@ import re
 from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 from altarb.mapping.leagues import LEAGUES
@@ -39,6 +39,7 @@ from altarb.venues import kalshi, polymarket
 
 TEMPLATES_PATH = PAIRS_PATH.with_name("rule_templates.json")
 PROPOSAL_PATH = PAIRS_PATH.with_name("refresh.csv")
+RUN_RECORD_PATH = PAIRS_PATH.with_name("refresh_last.json")  # read by `python -m altarb.status`
 
 _DATE = r"(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.? \d{1,2}, \d{4}|\d{4}-\d{2}-\d{2})"
 # Ordinary words that also appear in some team names ("Texas A&M", Kalshi's "Tie" market, "The ...").
@@ -332,6 +333,28 @@ def apply(proposal_path: Path | str, pairs_path: Path | str, verified_by: str, t
     return new
 
 
+def write_run_record(ready: list[MarketPair], review: list[Review], at: datetime,
+                     path: Path | str = RUN_RECORD_PATH) -> None:
+    """Save what the last refresh found, so `altarb.status` can report it without re-running it."""
+    record = {
+        "run_at": at.isoformat(),
+        "ready": len(ready),
+        "ready_by_league": dict(Counter(p.kalshi_ticker.split("-")[0] for p in ready)),
+        "review": [dataclasses.asdict(r) for r in review],
+        "applied": None,
+    }
+    Path(path).write_text(json.dumps(record, indent=1) + "\n", encoding="utf-8")
+
+
+def record_apply(markets: int, at: datetime, path: Path | str = RUN_RECORD_PATH) -> None:
+    try:
+        record = json.loads(Path(path).read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return
+    record["applied"] = {"at": at.isoformat(), "markets": markets}
+    Path(path).write_text(json.dumps(record, indent=1) + "\n", encoding="utf-8")
+
+
 # --- CLI -------------------------------------------------------------------------
 
 
@@ -372,6 +395,7 @@ def main() -> None:
         if not args.verified_by:
             parser.error("--apply needs --verified-by (e.g. Agent)")
         new = apply(PROPOSAL_PATH, PAIRS_PATH, args.verified_by, date.today())
+        record_apply(len(new), datetime.now(timezone.utc))
         print(f"Added {len(new)} verified pairs to {PAIRS_PATH} (verified_by={args.verified_by}).")
         return
 
@@ -409,6 +433,7 @@ def main() -> None:
     candidates = [c for c in suggest_pairs(km.values(), pm.values()) if (c.kalshi_ticker, c.polymarket_slug) not in existing]
     ready, review = propose(candidates, km, pm, templates)
     write_pairs(PROPOSAL_PATH, ready)
+    write_run_record(ready, review, datetime.now(timezone.utc))
     _print_proposal(ready, review)
     if ready:
         print("\nNothing is verified yet. After the owner approves this list in chat, run:\n"
