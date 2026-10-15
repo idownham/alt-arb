@@ -96,6 +96,9 @@ _ADDED_COLUMNS = {
 class Store:
     def __init__(self, path: Path | str = DEFAULT_PATH) -> None:
         self.conn = sqlite3.connect(path)
+        # WAL lets readers (altarb.status, the refresh's backup) read while a scan's long write
+        # transaction is open; with the default rollback journal they hit "database is locked" (2026-10-15).
+        self.conn.execute("PRAGMA journal_mode = WAL")
         self.conn.executescript(SCHEMA)
         self._migrate()
 
