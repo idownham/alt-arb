@@ -37,14 +37,24 @@ MAX_REFRESH_AGE = timedelta(hours=26)  # daily at 9am, plus slack for a late lap
 DISK_FULL_PCT = 90
 
 DB = "/opt/alt-arb/data/scanner.db"
+# Each query retries a locked or failed read; if all tries fail it reports `db_error=<sqlite3's message>`
+# instead of an empty value, so a read failure isn't mistaken for "no scans" (seen 2026-10-15).
 REMOTE_SCRIPT = f"""
+q() {{
+  for try in 1 2 3; do
+    if out=$(sqlite3 -readonly -cmd '.timeout 5000' {DB} "$1" 2>&1); then echo "$out"; return 0; fi
+    sleep 2
+  done
+  echo "$out" | tr '\\n' ' '
+  return 1
+}}
 echo "service=$(systemctl is-active altarb-scanner)"
-echo "last_scan=$(sqlite3 -readonly -cmd '.timeout 5000' {DB} \\
-  "SELECT finished_at || '|' || pairs_checked || '|' || errors FROM scans
-   WHERE finished_at IS NOT NULL ORDER BY id DESC LIMIT 1;")"
-echo "last_hour=$(sqlite3 -readonly -cmd '.timeout 5000' {DB} \\
-  "SELECT COUNT(*) || '|' || COALESCE(SUM(errors), 0) FROM scans
-   WHERE finished_at IS NOT NULL AND julianday('now') - julianday(started_at) <= 1.0 / 24;")"
+if r=$(q "SELECT finished_at || '|' || pairs_checked || '|' || errors FROM scans
+          WHERE finished_at IS NOT NULL ORDER BY id DESC LIMIT 1;"); then
+  echo "last_scan=$r"; else echo "db_error=$r"; fi
+if r=$(q "SELECT COUNT(*) || '|' || COALESCE(SUM(errors), 0) FROM scans
+          WHERE finished_at IS NOT NULL AND julianday('now') - julianday(started_at) <= 1.0 / 24;"); then
+  echo "last_hour=$r"; else echo "db_error=$r"; fi
 echo "disk=$(df -P / | tail -1 | awk '{{print $5 "|" $4}}')"
 echo "head=$(runuser -u altarb -- git -C /opt/alt-arb rev-parse HEAD 2>/dev/null)"
 """
@@ -67,6 +77,7 @@ class Server:
     disk_used_pct: int
     disk_free_kb: int
     head: str
+    db_error: str = ""  # sqlite3's message when the scan log couldn't be read
 
 
 # --- reading ------------------------------------------------------------------
@@ -106,6 +117,7 @@ def parse_server(text: str) -> Server:
         disk_used_pct=int(disk[0].rstrip("%")) if disk[0] else 0,
         disk_free_kb=int(disk[1]) if len(disk) > 1 else 0,
         head=fields.get("head", ""),
+        db_error=fields.get("db_error", "").strip(),
     )
 
 
@@ -159,14 +171,17 @@ def _age(delta: timedelta) -> str:
 
 def server_checks(s: Server, now: datetime) -> list[Check]:
     checks = [Check("Scanner service", s.service == "active", s.service)]
-    if s.last_scan_at is None:
-        checks.append(Check("Last scan", False, "no finished scan in the log"))
+    if s.db_error:  # don't judge scans from a log we couldn't read
+        checks.append(Check("Scan log", False, f"couldn't read DB: {s.db_error}"))
     else:
-        age = now - s.last_scan_at
-        checks.append(Check("Last scan", age <= MAX_SCAN_AGE,
-                            f"{s.last_scan_at:%Y-%m-%d %H:%M} UTC, {_age(age)} ago, {s.last_scan_pairs} pairs"))
-    checks.append(Check("Errors (last hour)", s.errors_last_hour == 0,
-                        f"{s.errors_last_hour} in {s.scans_last_hour} scans"))
+        if s.last_scan_at is None:
+            checks.append(Check("Last scan", False, "no finished scan in the log"))
+        else:
+            age = now - s.last_scan_at
+            checks.append(Check("Last scan", age <= MAX_SCAN_AGE,
+                                f"{s.last_scan_at:%Y-%m-%d %H:%M} UTC, {_age(age)} ago, {s.last_scan_pairs} pairs"))
+        checks.append(Check("Errors (last hour)", s.errors_last_hour == 0,
+                            f"{s.errors_last_hour} in {s.scans_last_hour} scans"))
     checks.append(Check("Disk", s.disk_used_pct < DISK_FULL_PCT,
                         f"{s.disk_used_pct}% used, {s.disk_free_kb / 1024 / 1024:.1f} GB free"))
     return checks

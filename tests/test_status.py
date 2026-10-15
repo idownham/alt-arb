@@ -1,6 +1,11 @@
 import json
+import shutil
+import sqlite3
+import subprocess
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
+
+import pytest
 
 from altarb import status
 from altarb.mapping.pairs import MarketPair
@@ -143,3 +148,59 @@ def test_refresh_writes_and_updates_run_record(tmp_path):
     assert saved["ready"] == 1 and saved["ready_by_league"] == {"KXNHLGAME": 1}
     assert saved["review"] == [{"kalshi_ticker": "K-1", "polymarket_slug": "s", "reason": "why"}]
     assert saved["applied"]["markets"] == 1
+
+
+LOCKED_OUTPUT = """service=active
+db_error=Error: in prepare, database is locked (5)
+disk=9%|23068672
+head=fac7a1e0000000000000000000000000000000000
+"""
+
+
+def test_unreadable_db_is_not_reported_as_no_scans():
+    s = status.parse_server(LOCKED_OUTPUT)
+    assert s.db_error == "Error: in prepare, database is locked (5)"
+    checks = status.server_checks(s, NOW)
+    assert [c.name for c in checks if not c.ok] == ["Scan log"]
+    assert checks[1].detail == "couldn't read DB: Error: in prepare, database is locked (5)"
+    assert not any("no finished scan" in c.detail or "0 in 0 scans" in c.detail for c in checks)
+
+
+def run_remote_script(db, tmp_path):
+    """REMOTE_SCRIPT run locally against `db`, with short lock waits so the test stays fast."""
+    script = (status.REMOTE_SCRIPT.replace(status.DB, str(db))
+              .replace(".timeout 5000", ".timeout 100").replace("sleep 2", "sleep 0"))
+    out = subprocess.run(["bash", "-c", script], capture_output=True, text=True, timeout=30, cwd=tmp_path)
+    return status.parse_server(out.stdout)
+
+
+def make_scan_log(db):
+    con = sqlite3.connect(db)
+    con.execute("CREATE TABLE scans (id INTEGER PRIMARY KEY, started_at TEXT, finished_at TEXT,"
+                " pairs_checked INTEGER, errors INTEGER)")
+    con.execute("INSERT INTO scans VALUES (1, '2026-10-15T16:00:00+00:00', '2026-10-15T16:03:44+00:00', 327, 0)")
+    con.commit()
+    return con
+
+
+@pytest.mark.skipif(not shutil.which("sqlite3"), reason="needs the sqlite3 CLI")
+def test_remote_script_reads_scan_log(tmp_path):
+    db = tmp_path / "scanner.db"
+    make_scan_log(db).close()
+    s = run_remote_script(db, tmp_path)
+    assert s.db_error == ""
+    assert s.last_scan_at == datetime(2026, 10, 15, 16, 3, 44, tzinfo=timezone.utc) and s.last_scan_pairs == 327
+
+
+@pytest.mark.skipif(not shutil.which("sqlite3"), reason="needs the sqlite3 CLI")
+def test_remote_script_reports_a_locked_db(tmp_path):
+    db = tmp_path / "scanner.db"
+    con = make_scan_log(db)
+    con.execute("BEGIN EXCLUSIVE")  # what a writer holds while it commits; readers get "database is locked"
+    try:
+        s = run_remote_script(db, tmp_path)
+    finally:
+        con.rollback()
+        con.close()
+    assert "locked" in s.db_error
+    assert s.last_scan_at is None

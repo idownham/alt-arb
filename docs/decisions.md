@@ -2,6 +2,26 @@
 
 Notable decisions, trade-offs, and known biases, newest first. The roadmap lives in `docs/plan.md`.
 
+## 2026-10-15 — 327 pairs, ~8–13 min scans; `altarb.status` misread a locked scan log as "no scans"
+
+**What changed:** the scanned pair count grew to 327 (281 on Oct 14, 149 when the 72h window was set on
+Oct 13) as the daily refresh added NBA, NHL and more college football. An HQ check of the droplet's journal
+on Oct 15 (~11:10 CT) showed scans finishing every ~8 min, with single scans taking ~7.5–13 min, up from ~4.2 min.
+
+**Why it matters for Decision A:** the Oct 13 entry's bias gets worse. A qualifying episode needs ≥ 2
+consecutive scans, so a gap must now last roughly 15–25 min to be counted reliably. Read a STOP or MARGINAL
+verdict with that in mind. The pre-registered criteria are unchanged. This records a known bias, not a new threshold.
+
+**Status false alarm (fixed):** `altarb.status` reported FAIL "no finished scan in the log" / "0 in 0 scans"
+while the scanner was fine. Its `sqlite3` reads on the droplet hit "database is locked" and the empty output
+was parsed as "no scans". Now each read retries 3 times and a failure is shown as `FAIL Scan log  couldn't read DB: …`.
+
+**Found while testing the fix (not changed, owner to decide):** the lock isn't brief. Three live checks in a
+row all hit it. The scanner commits only in `finish_scan`, so each scan is one long write transaction, and
+with SQLite's default rollback journal a large transaction can block readers for most of the scan. The likely
+fix is WAL mode (readers never wait for the writer) or committing per pair. That is a change to the running
+scanner, so it waits for an explicit go-ahead. Note: the daily refresh's `.backup` of the scan log can hit the same lock.
+
 ## 2026-10-13 — Kalshi's Friday placeholder dates: approve Oct 17 games, wait on Oct 24
 
 **What happened:** the daily refresh blocked 53 college football games (106 markets) because the
