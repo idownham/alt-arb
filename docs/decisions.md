@@ -2,6 +2,36 @@
 
 Notable decisions, trade-offs, and known biases, newest first. The roadmap lives in `docs/plan.md`.
 
+## 2026-10-28 — Decision point A: STOP ⭐ evidence → decision → consequence
+
+**Evidence** (`python -m altarb.report` on a copy of the droplet's scan log, 2026-10-28 ~23:00 UTC):
+- Coverage: 15.2 days of post-fix scanning, 6,494 scans, 813,062 pair checks, 8 leagues. That meets the
+  "enough data" rule (≥ 14 days, ≥ 3 leagues).
+- Best hedge cost before fees, per pair check: 87.8% cost $1.00–1.03, 8.2% ≥ $1.03, 2.8% $0.97–1.00, and
+  0.09% (746 checks) < $0.97.
+- Opportunity episodes: 1,040. 1,032 were in-play and 8 pre-game.
+- **Qualifying episodes (pre-game, ≥ 2 consecutive scans, peak ≥ $20): 0 = 0.0/week.** The pre-registered STOP line is < 1/week.
+- Not a near miss: no pre-game opportunity reached $20 even for a single scan. The largest pre-game profit
+  was $2.33 (NBA PHX @ OKC, Oct 26, one scan). Every one of the 487 logged opportunities ≥ $20 was in-play.
+  In-play gaps don't count by design: with a multi-minute scan they can't be captured reliably, and the largest of
+  them (> $17,000 on single scans) look like late-game books that had already moved, not real edge.
+
+**Decision (owner, in chat, 2026-10-28):** Decision point A = **STOP**. The pre-registered rule applies as written.
+Phases 3–4 (paper and live trading) won't be built. Per the plan, the scanner, fee/edge models, pair
+verification and data log stand as the finished project. A well-evidenced "no edge" is a valid result.
+
+**Known biases, all pointing toward under-counting edge** (recorded so the verdict is read honestly, not to reopen it):
+- Scan speed: scans took ~1.5–9 min, so gaps shorter than a scan are invisible (see the 2026-10-13 and 2026-10-15
+  entries). Only WebSockets (Phase 4, needs KYC'd keys) could test faster gaps. That's out of scope now.
+- Coverage fell in the last days: from Oct 25 the daily refresh blocked 245 markets as "Polymarket rules text
+  differs from the approved template", so scans covered only 72–76 pairs on Oct 26–27 (up to 361 earlier).
+- Oct 22, ~07:00 UTC: about one hour of scans (32 scans, 34,333 pair errors) failed outright. The report excludes
+  scans with no clean snapshots, which is why it shows 980 errors rather than the raw 34,359.
+
+**Consequence:** Osprey moves to close-out. The scanner and the daily refresh keep running for now. Shutting them
+down (and freeing the droplet for the other projects' recorders) is a separate owner decision. In HQ terms, an
+"Osprey STOP" opens Project Bloodhound's slot.
+
 ## 2026-10-15 — 327 pairs, ~8–13 min scans; `altarb.status` misread a locked scan log as "no scans"
 
 **What changed:** the scanned pair count grew to 327 (281 on Oct 14, 149 when the 72h window was set on
@@ -16,11 +46,13 @@ verdict with that in mind. The pre-registered criteria are unchanged. This recor
 while the scanner was fine. Its `sqlite3` reads on the droplet hit "database is locked" and the empty output
 was parsed as "no scans". Now each read retries 3 times and a failure is shown as `FAIL Scan log  couldn't read DB: …`.
 
-**Found while testing the fix (not changed, owner to decide):** the lock isn't brief. Three live checks in a
-row all hit it. The scanner commits only in `finish_scan`, so each scan is one long write transaction, and
-with SQLite's default rollback journal a large transaction can block readers for most of the scan. The likely
-fix is WAL mode (readers never wait for the writer) or committing per pair. That is a change to the running
-scanner, so it waits for an explicit go-ahead. Note: the daily refresh's `.backup` of the scan log can hit the same lock.
+**Found while testing the fix:** the lock wasn't brief. Three live checks in a row all hit it. The scanner
+commits only in `finish_scan`, so each scan is one long write transaction, and with SQLite's default rollback
+journal a large transaction can block readers for most of the scan.
+**Follow-up (owner approved, same day):** the scan log now uses WAL mode (`ef072f8`), so readers see the last
+committed state and never wait for the writer. A test reproduces the lock under the old journal mode. Deployed by
+the normal 15-min pull (scanner restarted on `ef072f8` at 16:49 UTC). The droplet then showed `journal_mode = wal`,
+scans finishing every ~8 min (338 pairs, 0 errors), and `altarb.status` HEALTHY.
 
 ## 2026-10-13 — Kalshi's Friday placeholder dates: approve Oct 17 games, wait on Oct 24
 

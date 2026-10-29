@@ -39,6 +39,9 @@ hours apart. They are artifacts, not edge: exclude them.
 **Decision point A (end of week 4):** Review the log. How often do net-positive gaps appear, how big,
 how deep, how long do they last? If edge is negligible, stop here — the system is still a finished project.
 
+**Result (2026-10-28): STOP.** 15.2 days and 8 leagues of clean data, 0 qualifying episodes (0.0/week; the largest
+pre-game gap was $2.33). Phases 3–4 won't be built. Evidence, biases and owner decision: `docs/decisions.md` (2026-10-28).
+
 **Decision point A criteria** — pre-registered 2026-10-13, before any clean data. Do not change them after
 looking at results; if they turn out to be wrong, say so explicitly and record the reason here.
 Run `python -m altarb.report` (mirrors these numbers in `src/altarb/report.py`).

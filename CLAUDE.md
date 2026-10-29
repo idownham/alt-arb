@@ -9,7 +9,7 @@ Owner: Ian Downham (GitHub: idownham). Side project, built part-time over ~2 mon
 Primary goal: a working, well-engineered system with real spread data. Trading P&L is a bonus, not the target.
 
 ## Current phase
-**Phase 2 — Edge calculation + data log (no money at risk).** See `docs/plan.md` for the full roadmap. Update this line when the phase changes.
+**Close-out — Decision point A = STOP (2026-10-28).** Phase 2 found no qualifying edge; Phases 3–4 won't be built. See `docs/plan.md` and `docs/decisions.md`. Update this line when the phase changes.
 Decision point A has pre-registered criteria in `docs/plan.md` (checked by `python -m altarb.report`). Don't change
 the thresholds after seeing data; if they must change, record why in the plan first.
 
