@@ -92,3 +92,18 @@ Ian's explicit approval of each pair or rules template (rule 3).
 - **AI use + Ian's judgment:** Claude ran the report, queried the log for the pre-game episodes and error bursts,
   and drafted these entries. Ian accepted the STOP verdict without changing the criteria.
 - **Not done yet:** Ian's first-hand spot-check of ~10 auto/agent-verified pairs.
+
+## 2026-11-08 — Droplet resized for the shared recorders
+- **Work:** Ian resized droplet `alt-arb` from Basic 1 vCPU / 1 GB / 25 GB ($6/mo) to **1 vCPU / 2 GB / 50 GB
+  ($12/mo)**, with the disk included (permanent, can't shrink back). This follows the HQ decision of 2026-10-15
+  to run all recorders on one server. Coin Toss and Slot Machine had been losing hours of data a day to laptop
+  sleep (Slot Machine's gaps add up to ~3–20 h a day since Oct 31). Moving them is done separately, from an HQ session.
+- **Test (after boot):** 2 GB RAM, `/dev/vda` 50 GB with the filesystem grown to 48 GB (44 GB free), the clock
+  NTP-synchronized, the scan log still in WAL mode, the scanner and update timer active, and `altarb.status`
+  scanner checks OK.
+- **Observation:** scan-log gap ≈ 4 min. The last scan before the power-off finished 2026-11-09 04:24:27 UTC and
+  the first after boot started 04:28:21 UTC and finished 04:32:00 (36 pairs, 0 errors). These are droplet clock
+  times, and NTP wasn't synced yet at boot, so treat the gap as approximate.
+- **AI use + Ian's judgment:** Claude walked through the resize steps and verified the server afterward. Ian chose
+  the plan ($12, not $18: a second CPU isn't needed at load ≈ 0.02, and $18 adds only 10 GB of disk) and did the
+  resize himself in the DigitalOcean console.
