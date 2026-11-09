@@ -93,6 +93,17 @@ Ian's explicit approval of each pair or rules template (rule 3).
   and drafted these entries. Ian accepted the STOP verdict without changing the criteria.
 - **Not done yet:** Ian's first-hand spot-check of ~10 auto/agent-verified pairs.
 
+## 2026-10-29 → 2026-11-08 — Scanner and refresh kept running after STOP (backfilled 2026-11-08)
+*From the git log and the scheduled task's run history.*
+- **Daily refresh commits** (markets auto-verified): Oct 29: 26 (`1b52b6b`) · Oct 30: 24 (`2dda98c`) ·
+  Oct 31: 16 (`785d6cb`) · Nov 1: 184 (`e0b849d`) · Nov 2: 12 (`91010db`) · Nov 3: 74 (`cb8517c`) ·
+  Nov 4: 20 (`4e32038`) · Nov 5: 10 (`b8591f8`) · Nov 6: 20 (`2fe75fb`) · Nov 7: 24 (`e9ac2fe`).
+- **Nov 8:** the run committed nothing. Polymarket US dropped the connection twice.
+- **Observation (2026-11-08 status):** the scanner was healthy but covered only ~36–42 pairs, because 142 markets sat in
+  "needs review" ("Polymarket rules text differs from the approved template"). Templates weren't re-approved
+  after STOP, since that would only matter if the project continued.
+- **Open owner decision:** shut down the scanner and refresh, or keep logging.
+
 ## 2026-11-08 — Droplet resized for the shared recorders
 - **Work:** Ian resized droplet `alt-arb` from Basic 1 vCPU / 1 GB / 25 GB ($6/mo) to **1 vCPU / 2 GB / 50 GB
   ($12/mo)**, with the disk included (permanent, can't shrink back). This follows the HQ decision of 2026-10-15
