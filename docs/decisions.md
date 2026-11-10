@@ -2,6 +2,30 @@
 
 Notable decisions, trade-offs, and known biases, newest first. The roadmap lives in `docs/plan.md`.
 
+## 2026-11-10 — Shutdown; a wrong-game pair surfaced in the post-verdict data ⭐ evidence → decision → consequence
+
+**Decision (Ian, 2026-11-09: "take over" on the recommendation to shut down cleanly):** Osprey's scanner and its 15-min
+update timer were stopped and disabled on the droplet at 2026-11-10 03:23 UTC. The daily refresh scheduled task is
+disabled. The code is unchanged and can be restarted.
+**Archive:** the final scan log (13,889 scans, last finished 2026-11-10 03:23:19 UTC) was backed up after the stop and
+copied to the laptop as `data/scanner-final-20261110.db` (1.7 GB, gitignored; `PRAGMA integrity_check` ok; sha256
+`484cf1a456ba1c5a826c5f809e3a7e7a16296217908edb5659b94856e1756694`). The droplet copy stays in `/opt/alt-arb/data`.
+
+**Evidence found while re-running the report on the full archive (through Nov 10):** the verdict is still STOP (0.5
+qualifying episodes/week over the whole period). But the only 2 "qualifying" episodes (Nov 4, 118 scans, peaks
+$29,540 and $30,558) came from a **wrong-game pair**: Kalshi `KXNCAAFGAME-26NOV07UKTENN` (Kentucky @ Tennessee) was matched
+to Polymarket `aec-cfb-wkent-mtnst-2026-11-07` (Western Kentucky vs Middle Tennessee State). The daily refresh
+auto-verified it (`verified_by = Auto`) on 2026-10-24 (`8dd6a02`). The name matching treated "Kentucky" ≈ "Western
+Kentucky" and "Tennessee" ≈ "Middle Tennessee", and every template check passed because both games use the same rules text.
+**Consequence:**
+- The two rows are now `verified = false` with a `WRONG GAME` note.
+- **The Oct 28 STOP verdict is unaffected.** These episodes start Nov 4, after the decision data. A wrong pair can only
+  invent fake edge, never hide real edge, so if anything this strengthens "no real edge".
+- This is the "resolution mismatch" risk the plan ranks first. Had Phase 3–4 traded, both legs could have lost. The
+  `Auto` exception to rule 3 needs a team-identity check (school/city must match exactly, not as a substring)
+  before it's ever reused.
+- The other 1,371 `Auto` rows weren't audited. Treat them as unverified for any reuse.
+
 ## 2026-10-28 — Decision point A: STOP ⭐ evidence → decision → consequence
 
 **Evidence** (`python -m altarb.report` on a copy of the droplet's scan log, 2026-10-28 ~23:00 UTC):

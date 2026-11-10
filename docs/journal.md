@@ -118,3 +118,15 @@ Ian's explicit approval of each pair or rules template (rule 3).
 - **AI use + Ian's judgment:** Claude walked through the resize steps and verified the server afterward. Ian chose
   the plan ($12, not $18: a second CPU isn't needed at load ≈ 0.02, and $18 adds only 10 GB of disk) and did the
   resize himself in the DigitalOcean console.
+
+## 2026-11-10 — Shutdown, archive, and a wrong-game pair ⭐
+- **Decision (Ian):** shut Osprey down cleanly (on 2026-11-09 Ian told the HQ chat to "take over" with its recommendations).
+- **Work:** scanner and update timer stopped and disabled at 03:23 UTC. Final scan log backed up after the stop and copied to
+  the laptop (`data/scanner-final-20261110.db`, 1.7 GB, checksum matched). Daily refresh task disabled.
+- ⭐ **Evidence → decision → consequence:** re-running `altarb.report` on the full archive still gives STOP (0.5/week), but the
+  only 2 qualifying episodes ($29.5k–30.6k peaks, Nov 4) came from Kentucky @ Tennessee matched to Western Kentucky vs Middle
+  Tennessee State. The daily refresh auto-verified it on Oct 24 (`8dd6a02`). → The rows were un-verified, and the
+  Oct 28 verdict is unaffected (the episodes came after it, and a wrong pair can only fake edge). → Recorded as the clearest
+  real example of the project's #1 risk: the name matcher needs exact team identity before any automatic approval is reused.
+- **AI use + Ian's judgment:** Claude (HQ chat) did the shutdown, archive and investigation, and drafted these entries.
+  Ian approved the shutdown. *Ian's judgment on the wrong-pair finding: (to fill in).*

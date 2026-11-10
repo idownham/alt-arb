@@ -41,6 +41,7 @@ how deep, how long do they last? If edge is negligible, stop here — the system
 
 **Result (2026-10-28): STOP.** 15.2 days and 8 leagues of clean data, 0 qualifying episodes (0.0/week; the largest
 pre-game gap was $2.33). Phases 3–4 won't be built. Evidence, biases and owner decision: `docs/decisions.md` (2026-10-28).
+**Shut down 2026-11-10** (scanner, update timer, daily refresh disabled; scan log archived). Post-verdict data surfaced one wrong-game auto-verified pair: `docs/decisions.md` (2026-11-10).
 
 **Decision point A criteria** — pre-registered 2026-10-13, before any clean data. Do not change them after
 looking at results; if they turn out to be wrong, say so explicitly and record the reason here.
